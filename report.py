@@ -8,15 +8,17 @@ import pyodbc
 # -------------------------------------------------
 # Configuration
 # -------------------------------------------------
-REPO = r"D:\DONE\newinbound"
+REPO = r"D:\DONE\report"
 CONNECTION_STRING = "DSN=pbi_supplier"
 
-TABLE_NAME = "data_tool_inbound_online"
-OUTPUT_FILE = "source.csv"
+REPORTS = {
+    "data_tool_outbound_report": "outbound.csv",
+    "data_tool_inbound_report": "inbound.csv",
+}
 
 
 def run_git(command):
-    """Run a git command and display the output."""
+    """Run a git command and display its output."""
     print(f"\n> {' '.join(command)}")
 
     result = subprocess.run(
@@ -33,50 +35,46 @@ def run_git(command):
         print(result.stderr)
 
     if result.returncode != 0:
-        raise RuntimeError(
-            f"Git command failed: {' '.join(command)}"
-        )
+        raise RuntimeError(f"Git command failed: {' '.join(command)}")
 
 
-def export_data():
+def export_reports():
     print("Connecting to database...")
 
     with pyodbc.connect(CONNECTION_STRING) as conn:
-        print(f"Exporting {TABLE_NAME}...")
+        for table, filename in REPORTS.items():
+            print(f"Exporting {table}...")
 
-        df = pd.read_sql_query(
-            f"SELECT * FROM {TABLE_NAME}",
-            conn,
-        )
+            df = pd.read_sql_query(
+                f"SELECT * FROM {table}",
+                conn,
+            )
 
-        output = os.path.join(REPO, OUTPUT_FILE)
-        df.to_csv(output, index=False)
+            output = os.path.join(REPO, filename)
+            df.to_csv(output, index=False)
 
-        print(f"Saved: {output}")
+            print(f"Saved: {output}")
 
 
 def push_to_github():
-    commit_message = f"Update data {datetime.now():%Y-%m-%d %H:%M}"
+    message = f"Update data {datetime.now():%Y-%m-%d %H:%M}"
 
     run_git(["git", "add", "."])
-    run_git(["git", "commit", "--allow-empty", "-m", commit_message])
+    run_git(["git", "commit", "--allow-empty", "-m", message])
 
-    # Refresh remote information
-    run_git(["git", "fetch", "origin"])
-
-    # Publish latest generated files
-    run_git(["git", "push", "--force", "origin", "main"])
+    # Overwrite remote only if nobody else has updated it
+    run_git(["git", "push", "--force-with-lease", "origin", "main"])
 
 
 def main():
     print("=" * 60)
-    print("NEW INBOUND EXPORT")
+    print("REPORT EXPORT")
     print("=" * 60)
 
-    export_data()
+    export_reports()
     push_to_github()
 
-    print("\nSUCCESS - GitHub updated successfully.")
+    print("\nSUCCESS - GitHub updated.")
 
 
 if __name__ == "__main__":
