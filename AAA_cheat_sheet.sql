@@ -29,9 +29,9 @@ SELECT *
 FROM inbound_ecom_new
 WHERE 0
 --
-INSERT INTO employee_new
+INSERT INTO shop
 SELECT *
-FROM employee
+FROM shop_new
 
 -- Create the new table with the same structure, order value column
 CREATE TABLE brand_sorted AS

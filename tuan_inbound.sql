@@ -122,7 +122,7 @@ ORDER BY d.id DESC;
 
 
 -- defect by style code
-select * from defect where style_code like "CK2-60782702" ;
+select * from defect where style_code like "CK1-60051076" ;
 
 
 

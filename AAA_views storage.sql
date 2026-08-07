@@ -39,9 +39,9 @@ transfer_order_quality_issue,
 substandard_qty,
 arrival_date,
 good_receipt_date,
-note
+i.note
 FROM inbound i
-LEFT JOIN shop s ON i.shop_code = s.shop_code
+LEFT JOIN "shop" s ON i.shop_code = s.shop_code
 WHERE good_receipt_date =
     (SELECT MAX(good_receipt_date)
      FROM inbound i2);
@@ -120,21 +120,19 @@ ORDER BY shop_code;
 
 CREATE VIEW AAA_cont_job AS
 SELECT
-id,
 arrival_date as Arrival_date,
+good_receipt_date as GR_date,
 input_type as Loại,
 note as tên_job,
-brand_name as nhãn,
-box_qty as số_thùng,
-NULLIF(input_standard, 0) as D111,
+CASE 
+    WHEN brand_name = 'Charles & Keith' THEN 'CK'
+    ELSE brand_name
+END AS brand,
+box_qty as thùng,
+NULLIF(input_standard, 0) as hàng_hóa,
 NULLIF(input_paper_bag, 0) as túi_giấy,
 NULLIF(input_visual_merchandising, 0) as VMR,
-purchase_order_num as PO,
-NULLIF(delivery_order_num, '-') as số_Post,
-good_issue_date as GI_date,
-substandard_qty as QI_Qty,
-current_action as action,
-good_receipt_date as GR_date
+purchase_order_num as PO
 FROM inbound
 WHERE region = 'CONT'
   AND note IN (
@@ -144,7 +142,7 @@ WHERE region = 'CONT'
     GROUP BY note
     ORDER BY MAX(arrival_date) DESC
   )
-ORDER BY arrival_date DESC, id;
+ORDER BY arrival_date DESC;
 
 CREATE VIEW AAA_outbound_DO_byday AS
 SELECT 
@@ -453,7 +451,7 @@ FROM monthly_totals m
 LEFT JOIN disparity_totals d ON m.brand_name = d.brand_name
 ORDER BY m.brand_name;
 
-CREATE VIEW vw_report_daily_diff_in_out_last_date2 AS
+CREATE VIEW vw_report_daily_diff_in_out_last_date AS
 SELECT 
     brand,
     MAX(date) AS date,
@@ -677,14 +675,14 @@ SELECT * FROM PBI_inbound_custom
 UNION ALL
 SELECT * FROM PBI_outbound_custom;
 
-CREATE VIEW vw_visual_asset_stock_in_hand AS
+CREATE VIEW AAA_Asset_stock_on_hand AS
 SELECT
     item_name,
     SUM(CASE WHEN status = 'inbound' THEN quantity ELSE 0 END) AS total_inbound,
     SUM(CASE WHEN status = 'outbound' THEN quantity ELSE 0 END) AS total_outbound,
     SUM(CASE WHEN status = 'inbound' THEN quantity ELSE 0 END)
       - SUM(CASE WHEN status = 'outbound' THEN quantity ELSE 0 END) AS stock_in_hand
-FROM visual_asset
+FROM inbound_visual_asset
 GROUP BY item_name
 HAVING 
     SUM(CASE WHEN status = 'inbound' THEN quantity ELSE 0 END)
@@ -715,7 +713,7 @@ SELECT
 FROM pullback AS p
 LEFT JOIN outbound_groupx AS g
   ON p.to_shop = g.shop_code
-LEFT JOIN shop AS s
+LEFT JOIN "shop" AS s
   ON p.to_shop = s.shop_code
 WHERE p.pullback_date = DATE('now')
   AND p.to_shop NOT LIKE '%D111%'
@@ -734,7 +732,7 @@ g.groupx
 FROM outbound_include as i
 LEFT JOIN outbound_groupx AS g
   ON i.shop_code = g.shop_code
-LEFT JOIN shop AS s
+LEFT JOIN "shop" AS s
   ON i.shop_code = s.shop_code
 WHERE i.dely_date = DATE('now')
 ORDER BY g.groupx, i.shop_code, s.shop_name ASC;
@@ -756,7 +754,7 @@ arrival_date,
 inbound_code
 FROM inbound
 WHERE current_action IS NULL AND region <> 'CONT'
-ORDER BY arrival_date;
+ORDER BY shop_name;
 
 CREATE VIEW AAA_timeline_cont AS
 WITH grouped AS (
@@ -991,8 +989,6 @@ LEFT JOIN date_tb d
     ON d.Date = date(i.arrival_date, '+7 day')
 WHERE i.region <> 'CONT';
 
---------------
-
 CREATE VIEW soh_by_kind AS
 SELECT 
     s.date,
@@ -1067,7 +1063,7 @@ d.results,
 d.purchase_order_num AS PO,
 d.shop_name AS tên_shop,
 d.defect_qty AS số_lượng,
---d.barcode,
+d.barcode,
 d.artical,
 d.item_full_name AS tên_sản_phẩm,
 d.defect_type AS lỗi,
@@ -1107,7 +1103,7 @@ FROM (
     FROM outbound o
     LEFT JOIN outbound_groupx g
         ON o.shop_code = g.shop_code
-    LEFT JOIN shop s
+    LEFT JOIN "shop" s
         ON o.shop_code = s.shop_code
     LEFT JOIN province p
         ON s.province_id = p.id
@@ -1126,7 +1122,7 @@ FROM (
     FROM outbound_include i
     LEFT JOIN outbound_groupx g
         ON i.shop_code = g.shop_code
-    LEFT JOIN shop s
+    LEFT JOIN "shop" s
         ON i.shop_code = s.shop_code
     LEFT JOIN province p
         ON s.province_id = p.id
@@ -1145,7 +1141,7 @@ FROM (
     FROM pullback p1
     LEFT JOIN outbound_groupx g
         ON p1.to_shop = g.shop_code
-    LEFT JOIN shop s
+    LEFT JOIN "shop" s
         ON p1.to_shop = s.shop_code
     LEFT JOIN province p
         ON s.province_id = p.id
@@ -1179,7 +1175,7 @@ s.carrier,
 a.arrival_date,
 a.way_bill
 FROM inbound a
-LEFT JOIN shop s ON a.shop_code = s.shop_code
+LEFT JOIN "shop" s ON a.shop_code = s.shop_code
 WHERE strftime('%Y-%m', arrival_date  ) = strftime('%Y-%m', DATE('now', 'start of month', '-1 month')) AND region != 'CONT' AND region = "tỉnh"
 GROUP BY
 a.way_bill,
