@@ -1,6 +1,7 @@
 -- nhập cont
 SELECT
 id,
+shop_code as code,
 note AS tên_job,
 CASE 
     WHEN brand_name = 'Charles & Keith' THEN 'CK'
@@ -50,7 +51,6 @@ WHERE good_receipt_date IS NULL AND region <> 'CONT';
 
 
 
-
 -- nhập bill vận chuyển
 SELECT
 id,
@@ -58,6 +58,8 @@ brand_name,
 shop_code AS code,
 shop_name AS tên_shop,
 box_qty AS số_thùng,
+input_standard,
+input_taras_defect,
 CONCAT(box_qty, '-', input_standard, '-', input_taras_defect, '-', input_paper_bag) AS input,
 input_type AS loại,
 delivery_order_num AS DO,
@@ -73,12 +75,9 @@ WHERE current_action IS NULL AND region <> 'CONT';
 
 
 
-
-
 -- all put
 SELECT
 id,
-brand_name,
 current_action AS action,
 shop_name AS tên_shop,
 input_type,
@@ -86,11 +85,9 @@ CONCAT(box_qty, '-', input_standard, '-', input_taras_defect, '-', input_paper_b
 transfer_order_num AS TO_num,
 transfer_order_quality_issue AS TO_QI,
 substandard_qty AS QI_Qty,
-arrival_date,
 good_receipt_date,
-purchase_order_num AS STO,
 delivery_order_num AS DO,
-way_bill 
+purchase_order_num
 FROM inbound
 WHERE action = 'post';
 
@@ -100,7 +97,7 @@ WHERE action = 'post';
 
 
 -- inbound by shop_code 
-select * from inbound where shop_code like '1130' and inbound.input_taras_defect = 0 order by id desc;
+select * from inbound where shop_code like '1047' and inbound.input_taras_defect = 0 order by id desc;
 
 
 
@@ -125,7 +122,7 @@ ORDER BY d.id DESC;
 
 
 -- defect by style code
-select * from defect where style_code like "CK1-70381159" ;
+select * from defect where style_code like "CK2-60782702" ;
 
 
 
@@ -149,10 +146,6 @@ SELECT
 FROM defect d
 WHERE d.results IS NULL
 ORDER BY d.id DESC;
-
-
-
-
 
 
 

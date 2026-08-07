@@ -77,7 +77,7 @@ CREATE TABLE a_diary (
 CREATE TABLE shop (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     shop_code TEXT UNIQUE NOT NULL,
-    brand TEXT NOT NULL,
+    brand TEXT NOT NULL DEFAULT '-',
     shop_name TEXT DEFAULT '-',
     status TEXT DEFAULT '-' CHECK (status IN ('opening', 'close', '-')),
     carrier TEXT DEFAULT '-',
@@ -394,7 +394,7 @@ CREATE TABLE inbound_visual_asset (
     FOREIGN KEY (check_date) REFERENCES date_tb(Date)
 );
 
-CREATE TABLE dim_employee (
+CREATE TABLE employee (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     employee_code TEXT UNIQUE,
     employee_full_name TEXT DEFAULT '-',
@@ -407,6 +407,7 @@ CREATE TABLE dim_employee (
     start_date DATE CHECK (start_date IS NULL OR strftime('%Y-%m-%d', start_date) = start_date),
     end_date DATE CHECK (end_date IS NULL OR strftime('%Y-%m-%d', end_date) = end_date),
     main_site_code TEXT DEFAULT 'D111',
+    note TEXT DEFAULT '-',
     FOREIGN KEY (start_date) REFERENCES date_tb(Date),
     FOREIGN KEY (end_date) REFERENCES date_tb(Date)
 );
@@ -503,23 +504,6 @@ CREATE TABLE userhistory (
     FOREIGN KEY (start_date) REFERENCES datetb(Date)
     FOREIGN KEY (end_date) REFERENCES datetb(Date)
 --    id, user_pda, employee_code, start_date, end_date
-);
-
-CREATE TABLE employee (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-	employee_code text unique not null,
-	sex text,
-	full_name text not null,
-	name text not null,
-	begin_date date CHECK ( begin_date IS NULL OR strftime('%Y-%m-%d', begin_date) = begin_date ),
-	quite_date date CHECK ( quite_date IS NULL OR strftime('%Y-%m-%d', quite_date) = quite_date ),
-	phone_num integer,
-	province_id integer,
-	FOREIGN KEY (begin_date) REFERENCES datetb(Date)
-	FOREIGN KEY (quite_date) REFERENCES datetb(Date)
-	FOREIGN KEY (province_id) REFERENCES province(id)
-	ON DELETE CASCADE
-    ON UPDATE CASCADE
 );
 
 CREATE TABLE typedata (

@@ -9,10 +9,11 @@ SELECT
     region as vùng,
     stock_transfer_order_num as số_PO,
     delivery_order_num as số_DO,
+    transfer_order_num,
     note,
     box_qty,
-    NULLIF(product_qty, 0) as hàng_hóa,
-	NULLIF(paper_bag_qty, 0) as túi_giấy,
+    product_qty,
+    paper_bag_qty,
     order_qty as SL_order
     FROM outbound
 	WHERE delivery_date = date('now')

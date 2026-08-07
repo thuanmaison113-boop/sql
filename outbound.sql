@@ -12,14 +12,24 @@ o.shop_code,
 o.checklist,
 O.stock_transfer_order_num ,
 o.note2 ,
+o.passed_qc_qty ,
+o.failed_qc_qty, 
 id
 FROM outbound o
 where o.transfer_order_num in (
 --where delivery_order_num in (
+2000200030,
+2000200020,
+2000200002,
+2000200004
 
-2000198948,
-2000198954,
-2000198958
+
+
+
+
+
+
+
 
 
 
