@@ -13,14 +13,14 @@ CREATE TABLE inbound (
     status TEXT DEFAULT 'Pending',
     purchase_order_num TEXT DEFAULT '-',
     delivery_order_num TEXT DEFAULT '-',
-	good_issue_date TEXT CHECK ( good_issue_date IS NULL OR (good_issue_date GLOB '[1-2][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]' AND strftime('%Y-%m-%d', good_issue_date) = good_issue_date)),
+	good_issue_date DATE CHECK (good_issue_date IS NULL OR strftime('%Y-%m-%d', good_issue_date) = good_issue_date),
     transfer_order_num TEXT DEFAULT '-',
     put_away_bin TEXT DEFAULT '-',
     transfer_order_quality_issue TEXT DEFAULT '-',
     substandard_qty INTEGER DEFAULT 0 CHECK (substandard_qty >= 0),   
-    arrival_date TEXT CHECK ( arrival_date IS NULL OR (arrival_date GLOB '[1-2][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]' AND strftime('%Y-%m-%d', arrival_date) = arrival_date)),
+    arrival_date DATE CHECK (arrival_date IS NULL OR strftime('%Y-%m-%d', arrival_date) = arrival_date),
     current_action TEXT CHECK (current_action IN ('post', 'confirm') OR current_action IS NULL),
-    good_receipt_date TEXT CHECK ( good_receipt_date IS NULL OR (good_receipt_date GLOB '[1-2][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]' AND strftime('%Y-%m-%d', good_receipt_date) = good_receipt_date)),
+    good_receipt_date DATE CHECK (good_receipt_date IS NULL OR strftime('%Y-%m-%d', good_receipt_date) = good_receipt_date),
     note TEXT DEFAULT '-',
     inbound_code TEXT,
     way_bill TEXT DEFAULT '-',
@@ -31,6 +31,11 @@ CREATE TABLE inbound (
     FOREIGN KEY (arrival_date) REFERENCES date_tb(Date),
     FOREIGN KEY (good_receipt_date) REFERENCES date_tb(Date)
 );
+
+CREATE INDEX idx_inbound_shop_code ON inbound(shop_code);
+CREATE INDEX idx_inbound_shop_name ON inbound(shop_name);
+CREATE INDEX idx_inbound_purchase_order_num ON inbound(purchase_order_num);
+CREATE INDEX idx_inbound_good_receipt_date ON inbound(good_receipt_date);
 
 CREATE TABLE outbound (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,6 +66,13 @@ CREATE TABLE outbound (
     FOREIGN KEY (order_date) REFERENCES date_tb(Date),
     FOREIGN KEY (delivery_date) REFERENCES date_tb(Date)
 );
+
+CREATE INDEX idx_outbound_post_date ON outbound(post_date);
+CREATE INDEX idx_outbound_delivery_date ON outbound(delivery_date);
+CREATE INDEX idx_outbound_stock_tranfer_oder_num ON outbound(stock_transfer_order_num);
+CREATE INDEX idx_outbound_shop_code ON outbound(shop_code);
+CREATE INDEX idx_outbound_delivery_order_num ON outbound(delivery_order_num);
+CREATE INDEX idx_outbound_transfer_order_num ON outbound(transfer_order_num);
 
 CREATE TABLE a_diary (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -99,6 +111,9 @@ CREATE TABLE shop (
         ON UPDATE CASCADE,
     FOREIGN KEY (carrier) REFERENCES carrier(id)
 );
+
+CREATE INDEX idx_shop_shop_name ON shop(shop_name);
+CREATE INDEX idx_shop_shop_code ON shop(shop_code);
 
 CREATE TABLE carrier (
     id TEXT PRIMARY KEY,
@@ -146,7 +161,6 @@ CREATE TABLE defect (
     style_code TEXT,
     checklist TEXT DEFAULT '-',
     FOREIGN KEY (purchase_order_num) REFERENCES inbound(purchase_order_num)
-        --ON DELETE CASCADE
         ON UPDATE CASCADE,
     FOREIGN KEY (barcode) REFERENCES item_list(barcode)
         ON UPDATE CASCADE
@@ -154,11 +168,8 @@ CREATE TABLE defect (
         ON UPDATE CASCADE
 );
 
-CREATE TABLE defect_type (
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-classification TEXT,
-vn_description TEXT
-);
+CREATE INDEX idx_defect_purchase_order_num ON defect(purchase_order_num);
+CREATE INDEX idx_defect_style_code ON defect(style_code);
 
 CREATE TABLE province (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -187,6 +198,10 @@ CREATE TABLE item_list (
         --ON DELETE CASCADE
         ON UPDATE CASCADE
 );
+
+CREATE INDEX idx_item_list_barcode ON item_list(barcode);
+CREATE INDEX idx_item_list_variant ON item_list(variant);
+CREATE INDEX idx_item_list_style_code ON item_list(style_code);
 
 CREATE TABLE item_type (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -268,9 +283,12 @@ CREATE TABLE date_tb (
 CREATE TABLE brand (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     brand_code TEXT UNIQUE NOT NULL,
-    brand_name TEXT NOT NULL,
-    storage_location TEXT NOT NULL
-);
+    brand_name TEXT NOT NULL DEFAULT '-',
+    storage_location TEXT NOT NULL DEFAULT '-',
+    is_active INTEGER NOT NULL DEFAULT 0,
+	is_reportable INTEGER NOT NULL DEFAULT 0,
+	note TEXT DEFAULT '-'
+)
 
 CREATE TABLE item_material (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -403,7 +421,7 @@ CREATE TABLE employee (
     gender TEXT CHECK (gender IN ('Male', 'Female', 'Other')) DEFAULT 'Male',
     phone_number TEXT DEFAULT '-',
     employee_role TEXT DEFAULT '-',
-    is_direct_labor BOOLEAN DEFAULT TRUE,
+    is_direct_labor INTEGER DEFAULT 1 CHECK (is_direct_labor IN (0, 1)),
     start_date DATE CHECK (start_date IS NULL OR strftime('%Y-%m-%d', start_date) = start_date),
     end_date DATE CHECK (end_date IS NULL OR strftime('%Y-%m-%d', end_date) = end_date),
     main_site_code TEXT DEFAULT 'D111',
@@ -453,12 +471,6 @@ CREATE TABLE a_documentation (
 	description TEXT
 );
 
-CREATE TABLE type_of_defect (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    classification TEXT,
-    description TEXT
-);
-
 CREATE TABLE cyclecount (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     site TEXT NOT NULL,
@@ -480,145 +492,6 @@ CREATE TABLE cyclecount (
     FOREIGN KEY (document_date) REFERENCES date_tb(Date)
 );
 
-CREATE TABLE cyclecountdata (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-	cyclecount_num text,
-	barcode text,
-	location text,
-	stock_qty integer,
-	cyclecount_qty integer,
-	disparity integer,
-	FOREIGN KEY (barcode) REFERENCES item(Barcode)
-	FOREIGN KEY (cyclecount_num) REFERENCES cyclecount(cyclecount_num)
-	ON DELETE CASCADE
-    ON UPDATE CASCADE
-);
-
-CREATE TABLE userhistory (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_pda TEXT,
-    employee_code text,
-    start_date DATE CHECK ( start_date IS NULL OR strftime('%Y-%m-%d', start_date) = start_date ),
-    end_date DATE CHECK ( end_date IS NULL OR strftime('%Y-%m-%d', end_date) = end_date ),
-    FOREIGN KEY (employee_code) REFERENCES employee(employee_code)
-    FOREIGN KEY (start_date) REFERENCES datetb(Date)
-    FOREIGN KEY (end_date) REFERENCES datetb(Date)
---    id, user_pda, employee_code, start_date, end_date
-);
-
-CREATE TABLE typedata (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-	type_scan text unique not null,
-	type_scan_full_name text
-);
-
-CREATE TABLE datascan (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-	type_scan text not null,
-	username text not null,
-	barcode text not null,
-	scan_qty integer not null,
-	scan_date date CHECK ( scan_date IS NULL OR strftime('%Y-%m-%d', scan_date) = scan_date ),
-	FOREIGN KEY (barcode) REFERENCES item(barcode)
-	FOREIGN KEY (type_scan) REFERENCES typedata(type_scan)
-	FOREIGN KEY (username) REFERENCES userhistory(user_pda)
-	FOREIGN KEY (scan_date) REFERENCES datetb(Date)
-	ON DELETE CASCADE
-    ON UPDATE CASCADE
-);
-
-CREATE TABLE inbound_cont(
-  id INT,
-  shop_code TEXT,
-  shop_name TEXT,
-  brand_name TEXT,
-  region TEXT,
-  box_qty INT,
-  input_standard INT,
-  input_taras_defect INT,
-  input_paper_bag INT,
-  input_visual_merchandising INT,
-  input_type TEXT,
-  status TEXT,
-  purchase_order_num TEXT,
-  delivery_order_num TEXT,
-  good_issue_date DATE,
-  transfer_order_num TEXT,
-  put_away_bin TEXT,
-  transfer_order_quality_issue TEXT,
-  substandard_qty INT,
-  arrival_date DATE ,
-  current_action TEXT,
-  good_receipt_date DATE,
-  note TEXT,
-  inbound_code TEXT,
-  way_bill TEXT,
-  checklist TEXT
-);
-
-CREATE TABLE inbound_pullback(
-  id INT,
-  shop_code TEXT,
-  shop_name TEXT,
-  brand_name TEXT,
-  region TEXT,
-  box_qty INT,
-  input_standard INT,
-  input_taras_defect INT,
-  input_paper_bag INT,
-  input_visual_merchandising INT,
-  input_type TEXT,
-  status TEXT,
-  purchase_order_num TEXT,
-  delivery_order_num TEXT,
-  good_issue_date DATE,
-  transfer_order_num TEXT,
-  put_away_bin TEXT,
-  transfer_order_quality_issue TEXT,
-  substandard_qty INT,
-  arrival_date DATE,
-  current_action TEXT,
-  good_receipt_date DATE,
-  note TEXT,
-  inbound_code TEXT,
-  way_bill TEXT,
-  checklist TEXT
-);
-
-CREATE TABLE task_type (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-	type TEXT,
-	standard_rate INTEGER DEFAULT 0 CHECK (standard_rate >= 0)
-);
-
-CREATE TABLE fact_work_output (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    task_id TEXT UNIQUE DEFAULT (
-    'TASK_' || strftime('%Y%m%d%H%M%S', 'now', 'localtime') 
-    || '_' || abs(random() % 10000)
-),
-    document TEXT DEFAULT '-',
-    note TEXT DEFAULT '-',
-    start_time TEXT CHECK (start_time GLOB '[0-2][0-9]:[0-5][0-9]' AND CAST(substr(start_time, 1, 2) AS INTEGER) <= 23 ),
-    end_time TEXT CHECK (end_time GLOB '[0-2][0-9]:[0-5][0-9]' AND CAST(substr(end_time, 1, 2) AS INTEGER) <= 23 ),
-	date DATE DEFAULT (DATE('now')),
-    task_type TEXT DEFAULT '-',
-    employee_id_involve TEXT DEFAULT '-',
-    work_output INTEGER DEFAULT 0 CHECK (work_output >= 0),    
-    FOREIGN KEY (date) REFERENCES date_tb(Date)
-    FOREIGN KEY (task_type) REFERENCES task_type(type)
-);
-
-CREATE TABLE soh (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date DATE NOT NULL CHECK (strftime('%Y-%m-%d', date) = date),
-    site TEXT NOT NULL CHECK (site IN ('D111', 'D116')),
-    barcode TEXT NOT NULL,
-    qty INTEGER NOT NULL CHECK (qty >= 0),
-    FOREIGN KEY (date) REFERENCES date_tb(Date),
-    FOREIGN KEY (barcode) REFERENCES item_list(barcode)
-);
-
 CREATE TABLE a_tcode (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     type TEXT DEFAULT '-',
@@ -630,4 +503,131 @@ CREATE TABLE a_reminder (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     note TEXT NOT NULL,
     created_at DATE DEFAULT (DATE('now')) CHECK (strftime('%Y-%m-%d', created_at) = created_at)
+);
+
+CREATE TABLE standard (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ware_house_code TEXT DEFAULT "-",
+    standard_code TEXT DEFAULT "-",
+	standard_value INTEGER CHECK (standard_value >= 0) DEFAULT 0,
+	standard_unit TEXT DEFAULT "-",
+	category TEXT DEFAULT "-"
+);
+
+CREATE TABLE pda_devices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_code TEXT DEFAULT '-',
+    serial_number TEXT DEFAULT '-',
+    phone_number TEXT UNIQUE,
+    brand TEXT DEFAULT '-',
+    model TEXT DEFAULT '-',
+    location TEXT DEFAULT 'D111',
+    assigned_to TEXT DEFAULT '-',
+    assigned_user_name TEXT DEFAULT '-',
+    note TEXT,
+    FOREIGN KEY (assigned_to) REFERENCES employee(employee_code)
+);
+
+CREATE TABLE soh_main (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+	article_number TEXT DEFAULT '-',
+	article_type TEXT DEFAULT '-',
+	brand TEXT DEFAULT '-',
+	site TEXT DEFAULT '-',
+	storage_location TEXT DEFAULT '-',
+	article_name TEXT DEFAULT '-',
+	category TEXT DEFAULT '-',
+	barcode TEXT DEFAULT '-',
+	old_article TEXT DEFAULT '-',
+	season TEXT DEFAULT '-',
+	color TEXT DEFAULT '-',
+	size TEXT DEFAULT '-',
+	unrestricted INTEGER DEFAULT 0,
+	blocked TEXT DEFAULT '-',
+	batch TEXT DEFAULT '-',
+	note TEXT DEFAULT '-',
+	snapshot_datetime TEXT NOT NULL DEFAULT (datetime('now', '+7 hours')),
+    FOREIGN KEY (brand) REFERENCES brand(brand_code),
+    FOREIGN KEY (barcode) REFERENCES item_list(barcode)
+);
+
+CREATE TABLE soh_taras (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+	article_number TEXT DEFAULT '-',
+	article_type TEXT DEFAULT '-',
+	brand TEXT DEFAULT '-',
+	site TEXT DEFAULT '-',
+	storage_location TEXT DEFAULT '-',
+	article_name TEXT DEFAULT '-',
+	category TEXT DEFAULT '-',
+	barcode TEXT DEFAULT '-',
+	old_article TEXT DEFAULT '-',
+	season TEXT DEFAULT '-',
+	color TEXT DEFAULT '-',
+	size TEXT DEFAULT '-',
+	unrestricted INTEGER DEFAULT 0,
+	blocked TEXT DEFAULT '-',
+	batch TEXT DEFAULT '-',
+	note TEXT DEFAULT '-',
+	snapshot_datetime TEXT NOT NULL DEFAULT (datetime('now', '+7 hours')),
+	FOREIGN KEY (brand) REFERENCES brand(brand_code),
+    FOREIGN KEY (barcode) REFERENCES item_list(barcode)
+);
+
+CREATE TABLE plan_mer_overall (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    brand_code TEXT NOT NULL DEFAULT '-',
+	brand_name TEXT NOT NULL DEFAULT '-',
+	plan_type TEXT CHECK (plan_type IN ('outbound', 'pullback', 'cont') OR plan_type IS NULL),
+	plan_month INTEGER DEFAULT 0 CHECK (plan_month >= 0),
+	plan_year INTEGER DEFAULT 2020 CHECK (plan_year >= 2020),
+	plan_qty INTEGER DEFAULT 0 CHECK (plan_qty >= 0),
+	FOREIGN KEY (brand_code) REFERENCES brand(brand_code)
+);
+
+CREATE TABLE plan_transaction_frequency (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    brand_code TEXT NOT NULL,
+	brand_name TEXT,
+	plan_type TEXT CHECK (plan_type IN ('outbound', 'pullback', 'cont') OR plan_type IS NULL),
+    day_of_week INTEGER DEFAULT 0 CHECK (day_of_week >= 0),
+    orders_per_week INTEGER DEFAULT 0 CHECK (orders_per_week >= 0),
+    FOREIGN KEY (brand_code) REFERENCES brand(brand_code)
+);
+
+CREATE TABLE plan_mer_detail (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  brand_code    TEXT NOT NULL,
+  plan_type     TEXT CHECK (plan_type IN ('outbound', 'pullback', 'cont') OR plan_type IS NULL),
+  delivery_date DATE CHECK (delivery_date IS NULL OR strftime('%Y-%m-%d', delivery_date) = delivery_date),
+  qty           INTEGER DEFAULT 0 CHECK (qty >= 0),
+  source        TEXT NOT NULL DEFAULT 'manual',
+  note          TEXT DEFAULT '-',
+  created_at    TEXT NOT NULL DEFAULT (DATE('now')),
+  UNIQUE (brand_code, plan_type, delivery_date),
+  FOREIGN KEY (brand_code) REFERENCES brand(brand_code)
+);
+
+CREATE TABLE employee_leave (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_code TEXT NOT NULL,
+    employee_full_name TEXT DEFAULT '-',
+    leave_type TEXT DEFAULT 'sick',
+    start_date DATE CHECK (start_date IS NULL OR strftime('%Y-%m-%d', start_date) = start_date),
+    end_date DATE CHECK (end_date IS NULL OR strftime('%Y-%m-%d', end_date) = end_date),
+    total_day INTEGER,
+    note TEXT DEFAULT '-',
+    FOREIGN KEY (employee_code) REFERENCES employee(employee_code) ON UPDATE CASCADE,
+  	CHECK (end_date >= start_date),
+  	CHECK (total_day > 0)
+);
+
+CREATE TABLE date_exception (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    start_date DATE NOT NULL CHECK (strftime('%Y-%m-%d', start_date) = start_date),
+    end_date DATE NOT NULL CHECK (strftime('%Y-%m-%d', end_date) = end_date),
+    off_type TEXT DEFAULT 'holiday',
+    description TEXT DEFAULT '-',
+    note TEXT DEFAULT '-',
+    CHECK (end_date >= start_date)
 );

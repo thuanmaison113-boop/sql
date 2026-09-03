@@ -1,23 +1,3 @@
-CREATE VIEW AAA_inbound_GI_current_month AS
-SELECT
-shop_code as mã_shop,
-shop_name as tên_shop,
-brand_name as nhãn,
-region as khu_vực,
-box_qty as số_thùng,
-NULLIF(input_standard, 0) as D111,
-NULLIF(input_taras_defect, 0) as D116,
-NULLIF(input_paper_bag, 0) as túi_giấy,
-NULLIF(input_visual_merchandising, 0) as VMR,
-input_type as Loại,
-status,
-good_issue_date as GI_date,
-arrival_date as Upload,
-good_receipt_date as GR_date,
-note
-FROM inbound i2
-WHERE strftime('%Y-%m', good_issue_date) = strftime('%Y-%m', 'now');
-
 CREATE VIEW AAA_inbound_last_gr_date AS
 SELECT
 i.shop_code,
@@ -144,20 +124,6 @@ WHERE region = 'CONT'
   )
 ORDER BY arrival_date DESC;
 
-CREATE VIEW AAA_outbound_DO_byday AS
-SELECT 
-	delivery_date as ngày_yêu_cầu_giao,
-	brand_name as nhãn,
-	shop_code as mã_shop,
-    shop_name as tên_shop,
-    region as vùng,
-    delivery_order_num as số_DO,
-    NULLIF(product_qty, 0) as hàng_hóa,
-	NULLIF(paper_bag_qty, 0) as túi_giấy
-FROM outbound
-WHERE post_date = '2025-06-24'
-GROUP BY shop_code;
-
 CREATE VIEW AAA_outbound_deli_today AS
 SELECT
 	id,
@@ -204,24 +170,6 @@ note
 FROM inbound
 WHERE good_receipt_date is null AND region <> "CONT";
 
-CREATE VIEW AAA_inbound_today AS
-SELECT
-shop_code as mã_shop,
-shop_name as tên_shop,
-box_qty as số_thùng,
-NULLIF(input_standard, 0) as D111,
-NULLIF(input_taras_defect, 0) as D116,
-NULLIF(input_paper_bag, 0) as túi_giấy,
-NULLIF(input_visual_merchandising, 0) as VMR,
-input_type as Loại,
-purchase_order_num as số_PO,
-delivery_order_num as số_DO,
-arrival_date as Upload,
-good_receipt_date as GR_date,
-note
-FROM inbound
-WHERE good_receipt_date = date('now');
-
 CREATE VIEW AAA_outbound_defect_taras AS
 SELECT
 id,
@@ -241,58 +189,7 @@ WHERE note LIKE '%defect%' AND post_date IS NULL
 ORDER BY id DESC
 LIMIT 10;
 
-CREATE VIEW AAA_ob_deli_today_include_multi AS
-SELECT 
-delivery_date AS ngày_yêu_cầu_giao,
-brand_name AS nhãn,
-CASE 
-WHEN o.shop_code = '4000' THEN s.shop_code 
-ELSE o.shop_code 
-END AS mã_shop,
-CASE 
-WHEN o.shop_code = '4000' THEN s.shop_name 
-ELSE o.shop_name 
-END AS tên_shop,
-o.region AS vùng,
-o.stock_transfer_order_num AS số_PO,
-o.delivery_order_num AS số_DO,
-o.note,
-o.box_qty,
-NULLIF(o.product_qty, 0) AS hàng_hóa,
-NULLIF(o.paper_bag_qty, 0) AS túi_giấy,
-o.order_qty AS SL_order
-FROM outbound o
-LEFT JOIN shop s ON o.shop_code = '4000' AND o.note = s.shop_code
-WHERE o.delivery_date = date('now')
-ORDER BY mã_shop ASC;
-
 CREATE VIEW AAA_ob_deli_today_include_multi_ck_pd AS
-SELECT 
-o.delivery_date AS ngày_yêu_cầu_giao,
-o.brand_name AS nhãn,
-CASE 
-WHEN o.shop_code IN ('4000', '1000', '1100') THEN s.shop_code 
-ELSE o.shop_code 
-END AS mã_shop,
-CASE 
-WHEN o.shop_code IN ('4000', '1000', '1100') THEN s.shop_name 
-ELSE o.shop_name 
-END AS tên_shop,
-o.stock_transfer_order_num AS số_PO,
-o.delivery_order_num AS số_DO,
-CASE 
-WHEN o.shop_code IN ('4000', '1000', '1100') THEN o.shop_code
-ELSE o.note
-END AS note,
-o.box_qty,
-NULLIF(o.product_qty, 0) AS hàng_hóa,
-NULLIF(o.paper_bag_qty, 0) AS túi_giấy,
-o.order_qty AS SL_order
-FROM outbound o
-LEFT JOIN shop s 
-ON o.shop_code IN ('4000', '1000', '1100') AND o.note = s.shop_code
-WHERE o.delivery_date = DATE('now')
-ORDER BY mã_shop ASC;
 
 CREATE VIEW AAA_outbound_pending  AS
 SELECT *
@@ -301,19 +198,18 @@ WHERE product_qty = 0
   AND paper_bag_qty = 0
   AND delivery_date >= DATE('now', '-3 days');
 
-CREATE VIEW vw_NXT_cyclecount_last_month AS
+CREATE VIEW AAA_Asset_stock_on_hand AS
 SELECT
-*
-FROM cyclecount
-WHERE document_date >= date('now', 'start of month', '-1 month')
-  AND document_date < date('now', 'start of month');
-
-CREATE VIEW vw_NXT_stocktaking_last_month AS
-SELECT
-*
-FROM stocktaking
-WHERE document_date >= date('now', 'start of month', '-1 month')
-  AND document_date < date('now', 'start of month');
+    item_name,
+    SUM(CASE WHEN status = 'inbound' THEN quantity ELSE 0 END) AS total_inbound,
+    SUM(CASE WHEN status = 'outbound' THEN quantity ELSE 0 END) AS total_outbound,
+    SUM(CASE WHEN status = 'inbound' THEN quantity ELSE 0 END)
+      - SUM(CASE WHEN status = 'outbound' THEN quantity ELSE 0 END) AS stock_in_hand
+FROM inbound_visual_asset
+GROUP BY item_name
+HAVING 
+    SUM(CASE WHEN status = 'inbound' THEN quantity ELSE 0 END)
+    - SUM(CASE WHEN status = 'outbound' THEN quantity ELSE 0 END) > 0;
 
 CREATE VIEW vw_report_outbound_last_month AS
 SELECT
@@ -329,16 +225,6 @@ note2
 FROM outbound
 WHERE post_date >= date('now', 'start of month', '-1 month')
   AND post_date < date('now', 'start of month');
-
-CREATE VIEW vw_NXT_total_outbound_tiki AS
-SELECT
-strftime('%Y-%m', post_date) AS year_month,
-brand_name,
-SUM(product_qty + paper_bag_qty) AS total_outbound
-FROM outbound
-WHERE post_date IS NOT NULL AND shop_code LIKE '%99M2%'
-GROUP BY year_month, brand_name
-ORDER BY year_month, brand_name;
 
 CREATE VIEW vw_report_defect_aggregation_by_ref AS
 SELECT 
@@ -497,6 +383,32 @@ FROM inbound
 WHERE DATE(good_issue_date) >= DATE('now', '-5 days')
   AND region <> 'CONT';
 
+
+
+CREATE VIEW vw_NXT_total_outbound_tiki AS
+SELECT
+strftime('%Y-%m', post_date) AS year_month,
+brand_name,
+SUM(product_qty + paper_bag_qty) AS total_outbound
+FROM outbound
+WHERE post_date IS NOT NULL AND shop_code LIKE '%99M2%'
+GROUP BY year_month, brand_name
+ORDER BY year_month, brand_name;
+
+CREATE VIEW vw_NXT_cyclecount_last_month AS
+SELECT
+*
+FROM cyclecount
+WHERE document_date >= date('now', 'start of month', '-1 month')
+  AND document_date < date('now', 'start of month');
+
+CREATE VIEW vw_NXT_stocktaking_last_month AS
+SELECT
+*
+FROM stocktaking
+WHERE document_date >= date('now', 'start of month', '-1 month')
+  AND document_date < date('now', 'start of month');
+
 CREATE VIEW vw_NXT_job_last_month AS
 SELECT
 id,
@@ -596,6 +508,9 @@ FROM outbound
 WHERE /*shop_code = '4000'*/ brand_name = 'MULTI'
   AND strftime('%Y-%m', post_date) = strftime('%Y-%m', DATE('now', 'start of month', '-1 month'));
 
+
+
+
 CREATE VIEW PBI_inbound_custom AS
 SELECT
     i.good_receipt_date AS date,
@@ -675,18 +590,8 @@ SELECT * FROM PBI_inbound_custom
 UNION ALL
 SELECT * FROM PBI_outbound_custom;
 
-CREATE VIEW AAA_Asset_stock_on_hand AS
-SELECT
-    item_name,
-    SUM(CASE WHEN status = 'inbound' THEN quantity ELSE 0 END) AS total_inbound,
-    SUM(CASE WHEN status = 'outbound' THEN quantity ELSE 0 END) AS total_outbound,
-    SUM(CASE WHEN status = 'inbound' THEN quantity ELSE 0 END)
-      - SUM(CASE WHEN status = 'outbound' THEN quantity ELSE 0 END) AS stock_in_hand
-FROM inbound_visual_asset
-GROUP BY item_name
-HAVING 
-    SUM(CASE WHEN status = 'inbound' THEN quantity ELSE 0 END)
-    - SUM(CASE WHEN status = 'outbound' THEN quantity ELSE 0 END) > 0;
+
+
 
 CREATE VIEW data_tool_outbound_deli_today AS
 SELECT 
@@ -755,6 +660,9 @@ inbound_code
 FROM inbound
 WHERE current_action IS NULL AND region <> 'CONT'
 ORDER BY shop_name;
+
+
+
 
 CREATE VIEW AAA_timeline_cont AS
 WITH grouped AS (
@@ -832,7 +740,7 @@ FROM AAA_timeline_cont
 GROUP BY strftime('%Y-%m', good_receipt_date)
 ORDER BY year_month;
 
-CREATE VIEW LUC666 AS
+CREATE VIEW AAA_LUC666 AS
 SELECT *
 FROM (
     SELECT *
@@ -871,7 +779,10 @@ SELECT *
 FROM outbound
 WHERE delivery_order_num = '-';
 
-CREATE VIEW AAA_PULLBACK_summary_month_1 AS
+
+
+
+CREATE VIEW AAA_PULLBACK_summary_month AS
 SELECT
     v.month,
     SUM(CASE WHEN v.timeline_status = 'dat' THEN 1 ELSE 0 END) AS dat_count,
@@ -879,7 +790,7 @@ SELECT
     COUNT(*) AS total_records,
     SUM(v.input_standard) AS hang_hoa,
     SUM(v.input_paper_bag) AS tui_giay
-FROM AAA_timeline_pullback_1 v
+FROM AAA_timeline_pullback v
 GROUP BY v.month;
 
 CREATE VIEW AAA_timeline_cont AS
@@ -888,7 +799,7 @@ WITH grouped AS (
         note,
         strftime('%Y', good_receipt_date) AS yr,
         SUM(input_standard) AS qty_sum
-    FROM inbound_new
+    FROM inbound
     WHERE region = 'CONT'
     GROUP BY note, yr
 ),
@@ -913,7 +824,7 @@ base AS (
                     ) * 1.5
                 )
         END AS sla_days
-    FROM inbound_new i
+    FROM inbound i
     JOIN grouped g
         ON i.note = g.note
        AND strftime('%Y', i.good_receipt_date) = g.yr
@@ -948,7 +859,7 @@ SELECT
     END AS sla_status
 FROM sunday_check;
 
-CREATE VIEW AAA_timeline_pullback_1 AS
+CREATE VIEW AAA_timeline_pullback AS
 SELECT
     i.shop_name,
     i.box_qty || '-' || 
@@ -989,58 +900,9 @@ LEFT JOIN date_tb d
     ON d.Date = date(i.arrival_date, '+7 day')
 WHERE i.region <> 'CONT';
 
-CREATE VIEW soh_by_kind AS
-SELECT 
-    s.date,
-    s.site,
-    ik.kind,
-    SUM(s.qty) AS total_qty
-FROM soh s
-LEFT JOIN item_list il 
-    ON s.barcode = il.barcode
-LEFT JOIN item_type it 
-    ON il.type = it.type
-LEFT JOIN item_kind ik 
-    ON it.type = ik.type
-GROUP BY 
-    s.date,
-    s.site,
-    ik.kind;
 
-CREATE VIEW soh_by_type AS
-SELECT 
-    s.date,
-    s.site,
-    it.type,
-    SUM(s.qty) AS total_qty
-FROM soh s
-LEFT JOIN item_list il 
-    ON s.barcode = il.barcode
-LEFT JOIN item_type it 
-    ON il.type = it.type
-GROUP BY 
-    s.date,
-    s.site,
-    it.type;
 
-CREATE VIEW soh_missing_barcodes AS
-SELECT 
-    s.barcode,
-    s.date,
-    s.site,
-    s.qty
-FROM soh s
-LEFT JOIN item_list il 
-    ON s.barcode = il.barcode
-WHERE il.barcode IS NULL;
 
-CREATE VIEW AAA_OUTBOUND_TIKI_LAST10 AS
-SELECT *
-FROM outbound
-WHERE shop_name = 'KHO ECOM THỦ ĐỨC'
-AND box_qty > 0
-ORDER BY id DESC
-LIMIT 10;
 
 CREATE VIEW vw_NXT_cont_summary_by_date_brand AS
 SELECT
@@ -1337,3 +1199,201 @@ SELECT
     FROM outbound
 	WHERE delivery_date = date('now')
 	ORDER BY shop_code ASC;
+
+CREATE VIEW vw_pbi_plan_daily AS
+WITH counted AS (
+  SELECT *,
+    ROW_NUMBER() OVER (PARTITION BY id, plan_month, plan_year ORDER BY delivery_date) AS rn,
+    COUNT(*) OVER (PARTITION BY id, plan_month, plan_year) AS cnt
+  FROM vw_pbi_plan_delivery_dates
+)
+SELECT
+  id, brand_code, brand_name, plan_type, plan_month, plan_year, plan_qty,
+  delivery_date, cnt AS delivery_days_in_month,
+  (plan_qty / cnt) + CASE WHEN rn <= (plan_qty % cnt) THEN 1 ELSE 0 END AS calc_qty
+FROM counted;
+
+CREATE VIEW vw_pbi_plan_final AS
+WITH detail_with_period AS (
+  SELECT
+    d.*,
+    dt.Month_Number_Of_Year AS plan_month,
+    dt.Year AS plan_year
+  FROM plan_mer_detail d
+  JOIN date_tb dt ON dt.Date = d.delivery_date
+),
+detail_sum AS (
+  SELECT brand_code, plan_type, plan_month, plan_year, SUM(qty) AS detail_total
+  FROM detail_with_period
+  GROUP BY brand_code, plan_type, plan_month, plan_year
+),
+calc_remaining AS (
+  SELECT
+    pd.*,
+    COALESCE(ds.detail_total, 0) AS detail_total,
+    pd.plan_qty - COALESCE(ds.detail_total, 0) AS qty_left
+  FROM vw_pbi_plan_daily pd
+  LEFT JOIN detail_sum ds
+    ON ds.brand_code = pd.brand_code AND ds.plan_type = pd.plan_type
+    AND ds.plan_month = pd.plan_month AND ds.plan_year = pd.plan_year
+  WHERE NOT EXISTS (
+    SELECT 1 FROM plan_mer_detail d
+    WHERE d.brand_code = pd.brand_code AND d.plan_type = pd.plan_type
+    AND d.delivery_date = pd.delivery_date
+  )
+),
+recounted AS (
+  SELECT *,
+    ROW_NUMBER() OVER (PARTITION BY brand_code, plan_type, plan_month, plan_year ORDER BY delivery_date) AS rn,
+    COUNT(*) OVER (PARTITION BY brand_code, plan_type, plan_month, plan_year) AS cnt
+  FROM calc_remaining
+)
+SELECT
+  brand_code, brand_name, plan_type, plan_month, plan_year,
+  delivery_date,
+  CASE WHEN cnt = 0 THEN 0
+       ELSE (qty_left / cnt) + CASE WHEN rn <= (qty_left % cnt) THEN 1 ELSE 0 END
+  END AS qty,
+  'calculated' AS source,
+  NULL AS note
+FROM recounted
+UNION ALL
+SELECT
+  d.brand_code,
+  p.brand_name,
+  d.plan_type, dp.plan_month, dp.plan_year,
+  d.delivery_date,
+  d.qty,
+  d.source,
+  d.note
+FROM plan_mer_detail d
+JOIN detail_with_period dp ON dp.id = d.id
+LEFT JOIN plan_mer_overall p
+  ON p.brand_code = d.brand_code AND p.plan_type = d.plan_type
+  AND p.plan_month = dp.plan_month AND p.plan_year = dp.plan_year;
+
+CREATE VIEW vw_pbi_month_end_dates AS
+SELECT
+    Year AS year,
+    Month_Number_Of_Year AS month_number,
+    MAX(Date) AS month_end,
+    MIN(Start_of_Month) AS month_start,
+    MAX(Quarter) AS quarter,
+    MAX(Month_Name) AS month_name,
+    MAX(Month_Short) AS month_short,
+    Year || '-' || substr('00' || Month_Number_Of_Year, -2) AS year_month
+FROM date_tb
+WHERE Date <= DATE('now')
+GROUP BY Year, Month_Number_Of_Year;
+
+CREATE VIEW vw_pbi_employee_headcount_monthly AS
+SELECT
+    dm.month_end, dm.year, dm.month_number, dm.year_month, dm.quarter, dm.month_name,
+    e.employee_code,
+    e.employee_full_name,
+    e.gender,
+    e.employee_role,
+    e.is_direct_labor,
+    CASE WHEN e.is_direct_labor = 1 THEN 'Direct Labor' ELSE 'Indirect Labor' END AS labor_type,
+    e.main_site_code,
+    e.start_date,
+    e.end_date,
+    CAST((julianday(dm.month_end) - julianday(e.start_date)) / 30 AS INTEGER) AS tenure_months
+FROM vw_pbi_month_end_dates dm
+JOIN employee e
+    ON e.start_date <= dm.month_end
+   AND (e.end_date IS NULL OR e.end_date >= dm.month_end);
+
+CREATE VIEW vw_pbi_employee_leave_detail AS
+SELECT
+    el.id AS leave_id,
+    el.employee_code,
+    e.employee_full_name,
+    e.gender,
+    e.employee_role,
+    e.is_direct_labor,
+    CASE WHEN e.is_direct_labor = 1 THEN 'Direct Labor' ELSE 'Indirect Labor' END AS labor_type,
+    e.main_site_code,
+    el.leave_type,
+    el.start_date,
+    el.end_date,
+    el.total_day,
+    dt.Year AS leave_year,
+    dt.Month_Number_Of_Year AS leave_month_number,
+    dm.year_month AS leave_year_month
+FROM employee_leave el
+JOIN employee e ON e.employee_code = el.employee_code
+JOIN date_tb dt ON dt.Date = el.start_date
+JOIN vw_pbi_month_end_dates dm ON dm.year = dt.Year AND dm.month_number = dt.Month_Number_Of_Year;
+
+CREATE VIEW outbound_compare_2025_2026_CK AS
+SELECT
+    strftime('%m',delivery_date ) AS month,
+    SUM(CASE WHEN strftime('%Y', delivery_date) = '2025'
+             THEN product_qty ELSE 0 END) AS qty_2025,
+    SUM(CASE WHEN strftime('%Y', delivery_date) = '2026'
+             THEN product_qty ELSE 0 END) AS qty_2026
+FROM outbound
+WHERE brand_name = 'Charles & Keith'
+  AND strftime('%Y', delivery_date) IN ('2025', '2026')
+GROUP BY month
+ORDER BY month;
+
+CREATE VIEW inbound_compare_2025_2026_CK AS
+SELECT
+    strftime('%m', arrival_date) AS month,
+    SUM(CASE
+        WHEN strftime('%Y', arrival_date) = '2025'
+        THEN input_standard + input_taras_defect ELSE 0 END) AS qty_2025,
+    SUM(CASE
+        WHEN strftime('%Y', arrival_date) = '2026'
+        THEN input_standard + input_taras_defect ELSE 0 END) AS qty_2026
+FROM inbound
+WHERE brand_name = 'Charles & Keith'
+    AND region <> 'CONT'
+    AND strftime('%Y', arrival_date) IN ('2025', '2026')
+GROUP BY month
+ORDER BY month;
+
+CREATE VIEW vw_pbi_soh_capacity_base AS
+SELECT
+    s.barcode,
+    s.brand,
+    s.site,
+    s.unrestricted,
+    it.type AS item_type
+FROM (
+    SELECT barcode, brand, site, unrestricted FROM soh_main
+    UNION ALL
+    SELECT barcode, brand, site, unrestricted FROM soh_taras
+) s
+LEFT JOIN item_list il ON s.barcode = il.barcode
+LEFT JOIN item_type it ON il.type = it.type
+WHERE it.type IS NULL OR it.type <> 'túi giấy';
+
+CREATE VIEW vw_pbi_plan_delivery_dates AS
+SELECT DISTINCT
+  p.id, p.brand_code, p.brand_name, p.plan_type,
+  p.plan_month, p.plan_year, p.plan_qty,
+  dt.Date AS delivery_date
+FROM plan_mer_overall p
+JOIN plan_transaction_frequency f
+  ON f.brand_code = p.brand_code AND f.plan_type = p.plan_type
+JOIN date_tb dt
+  ON dt.Year = p.plan_year
+  AND dt.Month_Number_Of_Year = p.plan_month
+  AND dt.Day_Of_Week_Number = f.day_of_week
+WHERE NOT EXISTS (
+    SELECT 1 FROM date_exception de
+    WHERE dt.Date >= de.start_date AND dt.Date <= de.end_date
+);
+
+CREATE VIEW test_ AS
+SELECT
+im.*,
+SUBSTR(il.style_code, 1, 4) AS style_code,
+il.brand_name
+FROM item_material im
+LEFT JOIN item_list il
+ON im.barcode = il.barcode
+WHERE im.material = 'DA';

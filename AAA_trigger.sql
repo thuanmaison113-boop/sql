@@ -153,3 +153,106 @@ BEGIN
     WHERE rowid = NEW.rowid;
 END;
 
+----------------pda_devices_insert
+CREATE TRIGGER pda_devices_insert
+AFTER INSERT ON pda_devices
+FOR EACH ROW
+BEGIN
+    UPDATE pda_devices
+    SET assigned_user_name = (
+        SELECT e.employee_short_name 
+        FROM employee e 
+        WHERE e.user_SAP = NEW.assigned_to
+    )
+    WHERE rowid = NEW.rowid;
+END;
+
+----------------plan_mer_overall_add_brand_name
+CREATE TRIGGER plan_mer_overall_add_brand_name
+AFTER INSERT ON plan_mer_overall
+FOR EACH ROW
+BEGIN
+    UPDATE plan_mer_overall
+    SET 
+        brand_name = (SELECT b.brand_name FROM brand b WHERE b.brand_code = NEW.brand_code)
+       	WHERE rowid = NEW.rowid;
+END;
+
+----------------plan_transaction_frequency_add_brand_name
+CREATE TRIGGER plan_transaction_frequency_add_brand_name
+AFTER INSERT ON plan_transaction_frequency
+FOR EACH ROW
+BEGIN
+    UPDATE plan_transaction_frequency
+    SET 
+        brand_name = (SELECT b.brand_name FROM brand b WHERE b.brand_code = NEW.brand_code)
+       	WHERE rowid = NEW.rowid;
+END;
+
+----------------employee_leave_add_name
+CREATE TRIGGER employee_leave_add_name
+AFTER INSERT ON employee_leave
+FOR EACH ROW
+BEGIN
+    UPDATE employee_leave
+    SET 
+        employee_full_name = (SELECT b.employee_full_name FROM employee b WHERE b.employee_code = NEW.employee_code)
+       	WHERE rowid = NEW.rowid;
+END;
+
+----------------employee_leave_calc_total_day
+CREATE TRIGGER employee_leave_calc_total_day
+AFTER INSERT ON employee_leave
+FOR EACH ROW
+WHEN NEW.start_date IS NOT NULL
+ AND NEW.end_date IS NOT NULL
+BEGIN
+    UPDATE employee_leave
+    SET total_day = (
+        SELECT COUNT(*)
+        FROM (
+            WITH RECURSIVE dates(d) AS (
+                SELECT NEW.start_date
+                UNION ALL
+                SELECT date(d, '+1 day')
+                FROM dates
+                WHERE d < NEW.end_date
+            )
+            SELECT d
+            FROM dates
+            WHERE strftime('%w', d) <> '0'
+        )
+    )
+    WHERE id = NEW.id;
+END;
+
+----------------employee_leave_calc_total_day_update
+CREATE TRIGGER employee_leave_calc_total_day_update
+AFTER UPDATE OF start_date, end_date ON employee_leave
+FOR EACH ROW
+WHEN NEW.start_date IS NOT NULL
+ AND NEW.end_date IS NOT NULL
+BEGIN
+    UPDATE employee_leave
+    SET total_day = (
+        SELECT COUNT(*)
+        FROM (
+            WITH RECURSIVE dates(d) AS (
+                SELECT NEW.start_date
+                UNION ALL
+                SELECT date(d, '+1 day')
+                FROM dates
+                WHERE d < NEW.end_date
+            )
+            SELECT d
+            FROM dates
+            WHERE strftime('%w', d) <> '0'
+        )
+    )
+    WHERE id = NEW.id;
+END;
+
+
+
+
+

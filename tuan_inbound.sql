@@ -1,4 +1,4 @@
--- nhập cont
+ -- nhập cont
 SELECT
 id,
 shop_code as code,
@@ -20,7 +20,9 @@ current_action AS action,
 good_receipt_date AS GR_date
 FROM inbound
 WHERE region = 'CONT'
-ORDER BY id DESC
+ORDER BY id DESC;
+
+
 
 
 
@@ -33,20 +35,23 @@ shop_code as code,
 shop_name AS shop,
 current_action AS action,
 good_receipt_date as GRdate,
-transfer_order_num AS TO_,
+put_away_bin AS Bin,
 input_type AS loại,
 box_qty,
 input_standard,
-input_taras_defect,
 input_paper_bag,
-CONCAT(box_qty, '-', input_standard, '-', input_taras_defect, '-', input_paper_bag) AS input,
+input_taras_defect,
+--CONCAT(box_qty, '-', input_standard, '-', input_taras_defect, '-', input_paper_bag) AS input,
 transfer_order_quality_issue AS TO_QI,
 substandard_qty AS QI_Qty,
 purchase_order_num AS STO,
 delivery_order_num AS DO,
+good_issue_date AS send_date,
 arrival_date
 FROM inbound  
 WHERE good_receipt_date IS NULL AND region <> 'CONT';
+--WHERE purchase_order_num IN ()
+
 
 
 
@@ -60,15 +65,13 @@ shop_name AS tên_shop,
 box_qty AS số_thùng,
 input_standard,
 input_taras_defect,
-CONCAT(box_qty, '-', input_standard, '-', input_taras_defect, '-', input_paper_bag) AS input,
+arrival_date AS Arrival,
+way_bill,
 input_type AS loại,
 delivery_order_num AS DO,
-good_issue_date AS send_date,
-arrival_date AS Arrival,
-way_bill
+good_issue_date AS send_date
 FROM inbound
 WHERE current_action IS NULL AND region <> 'CONT';
-
 
 
 
@@ -79,10 +82,11 @@ WHERE current_action IS NULL AND region <> 'CONT';
 SELECT
 id,
 current_action AS action,
+brand_name AS brand,
 shop_name AS tên_shop,
 input_type,
 CONCAT(box_qty, '-', input_standard, '-', input_taras_defect, '-', input_paper_bag) AS box_hh_taras_tg,
-transfer_order_num AS TO_num,
+put_away_bin AS bin,
 transfer_order_quality_issue AS TO_QI,
 substandard_qty AS QI_Qty,
 good_receipt_date,
@@ -91,38 +95,6 @@ purchase_order_num
 FROM inbound
 WHERE action = 'post';
 
-
-
-
-
-
--- inbound by shop_code 
-select * from inbound where shop_code like '1047' and inbound.input_taras_defect = 0 order by id desc;
-
-
-
--- defect by shop_code
-SELECT
-d.id,
-d.results,
-d.purchase_order_num AS PO,
-d.shop_name AS tên_shop,
-d.defect_qty AS số_lượng,
-d.barcode,
-d.artical ,
-d.item_full_name AS tên_sản_phẩm,
-d.defect_type AS lỗi,
-d.solution AS hướng_xử_lý,
-d.note
-FROM defect d
-		INNER JOIN inbound i ON d.purchase_order_num = i.purchase_order_num
-		WHERE i.shop_code = '1062'
-ORDER BY d.id DESC;
-
-
-
--- defect by style code
-select * from defect where style_code like "CK1-60051076" ;
 
 
 
@@ -151,6 +123,48 @@ ORDER BY d.id DESC;
 
 
 
+
+
+
+
+
+-- inbound by shop_code 
+select * from inbound where shop_code like 'PD D122' and inbound.input_taras_defect = 0 order by id desc;
+
+
+
+-- defect by shop_code
+SELECT
+d.id,
+d.results,
+d.purchase_order_num AS PO,
+d.shop_name AS tên_shop,
+d.defect_qty AS số_lượng,
+d.barcode,
+d.artical ,
+d.item_full_name AS tên_sản_phẩm,
+d.defect_type AS lỗi,
+d.solution AS hướng_xử_lý,
+d.note
+FROM defect d
+		INNER JOIN inbound i ON d.purchase_order_num = i.purchase_order_num
+		WHERE i.shop_code = '1139'
+ORDER BY d.id DESC;
+
+
+
+-- defect by style code
+select * from defect where style_code like "PM1-85110493" ;
+
+
+
+
+
+
+
+
+
+
 -- add inbound
 SELECT
 shop_code,
@@ -161,6 +175,7 @@ input_standard,
 input_taras_defect,
 note,
 arrival_date,
+input_type,
 id
 FROM inbound 
 ORDER BY id DESC LIMIT 1;
@@ -179,5 +194,4 @@ SELECT * FROM outbound ORDER BY id DESC LIMIT 1;
 
 -- add disparity
 SELECT * FROM outbound_disparity od  ORDER BY id DESC LIMIT 1;
-
 
