@@ -508,6 +508,19 @@ FROM outbound
 WHERE /*shop_code = '4000'*/ brand_name = 'MULTI'
   AND strftime('%Y-%m', post_date) = strftime('%Y-%m', DATE('now', 'start of month', '-1 month'));
 
+CREATE VIEW vw_NXT_cont_summary_by_date_brand AS
+SELECT
+    good_issue_date,
+    brand_name,
+    SUM(NULLIF(input_standard, 0)) AS total_D111,
+    SUM(NULLIF(input_paper_bag, 0)) AS total_tui_giay,
+    SUM(NULLIF(input_visual_merchandising, 0)) AS total_VMR
+FROM inbound
+WHERE region = 'CONT'
+  AND good_issue_date >= date('now', 'start of month', '-1 month')
+  AND good_issue_date < date('now', 'start of month')
+GROUP BY good_issue_date, brand_name
+ORDER BY good_issue_date, brand_name;
 
 
 
@@ -660,6 +673,53 @@ inbound_code
 FROM inbound
 WHERE current_action IS NULL AND region <> 'CONT'
 ORDER BY shop_name;
+
+CREATE VIEW data_tool_inbound_report AS
+SELECT
+shop_code,
+shop_name,
+brand_name,
+region,
+box_qty,
+NULLIF(input_standard, 0) as product_qty,
+NULLIF(input_taras_defect, 0) as taras_qty,
+NULLIF(input_paper_bag, 0) as paper_qty,
+NULLIF(input_visual_merchandising, 0) as vm_qty,
+input_type,
+status,
+delivery_order_num as DO_num,
+good_issue_date as GI_date,
+arrival_date,
+good_receipt_date as GR_date,
+note
+FROM inbound
+WHERE good_receipt_date is null AND region <> "CONT";
+
+CREATE VIEW data_tool_outbound_report AS
+SELECT
+	id,
+	delivery_date,
+	post_date,
+    CASE
+    WHEN post_date IS NOT NULL THEN 'posted'
+    ELSE 'post null'
+    END AS "check",
+	checklist,
+	brand_name,
+	shop_code,
+    shop_name,
+    region,
+    stock_transfer_order_num as PO_num,
+    delivery_order_num as DO_num,
+    note as type,
+    box_qty,
+    NULLIF(product_qty, 0) as product_qty,
+	NULLIF(paper_bag_qty, 0) as paper_qty,
+    order_qty
+    FROM outbound
+	WHERE delivery_date = date('now')
+	ORDER BY shop_code ASC;
+
 
 
 
@@ -904,20 +964,6 @@ WHERE i.region <> 'CONT';
 
 
 
-CREATE VIEW vw_NXT_cont_summary_by_date_brand AS
-SELECT
-    good_issue_date,
-    brand_name,
-    SUM(NULLIF(input_standard, 0)) AS total_D111,
-    SUM(NULLIF(input_paper_bag, 0)) AS total_tui_giay,
-    SUM(NULLIF(input_visual_merchandising, 0)) AS total_VMR
-FROM inbound
-WHERE region = 'CONT'
-  AND good_issue_date >= date('now', 'start of month', '-1 month')
-  AND good_issue_date < date('now', 'start of month')
-GROUP BY good_issue_date, brand_name
-ORDER BY good_issue_date, brand_name;
-
 CREATE VIEW AAA_defect_pending AS
 SELECT
 d.id,
@@ -1048,157 +1094,9 @@ a.region,
 s.carrier,
 a.arrival_date;
 
-CREATE VIEW test_expect_date AS
-SELECT
-    t.shop_code AS mã_shop,
-    MAX(t.shop_name) AS tên_shop,
-    SUM(t.box_qty) AS số_thùng,
-    '-' AS bill_vận_chuyển,
-    CASE
-        WHEN (CAST(strftime('%w', DATE('now')) AS INTEGER) + MAX(t.lead_time_day)) >= 7
-        THEN DATE('now', '+' || (MAX(t.lead_time_day) + 1) || ' days')
-        ELSE DATE('now', '+' || MAX(t.lead_time_day) || ' days')
-    END AS ngày_giao_hàng_dự_kiến,
-    CASE
-        WHEN MAX(t.carrier) = 'nhattin' THEN 'Nhất Tín'
-        WHEN MAX(t.carrier) = 'vintran' THEN 'VinTrans'
-        ELSE MAX(t.carrier)
-    END AS Đơn_vị_vận_chuyển,
-    MAX(t.contact_name) AS contact_name,
-    MAX(t.contact_phone) AS contact_phone,
-    MAX(t.tracking_url) AS tracking_url
-FROM (
-    SELECT
-        o.shop_code,
-        o.shop_name,
-        o.delivery_order_num AS do_num,
-        o.note,
-        o.box_qty,
-        g.groupx,
-        s.lead_time_day,
-        s.carrier,
-        c.contact_name,
-        c.contact_phone,
-        c.tracking_url
-    FROM outbound o
-    LEFT JOIN outbound_groupx g
-        ON o.shop_code = g.shop_code
-    LEFT JOIN shop s
-        ON o.shop_code = s.shop_code
-    LEFT JOIN province p
-        ON s.province_id = p.id
-    LEFT JOIN carrier c 
-    	ON s.carrier = c.id
-    WHERE o.delivery_date = DATE('now')
-      AND p.region = 'tỉnh'
-    UNION ALL
-    SELECT
-        i.shop_code,
-        s.shop_name,
-        i.note AS do_num,
-        i.item_name AS note,
-        i.box_qty,
-        g.groupx,
-        s.lead_time_day,
-        s.carrier,
-        c.contact_name,
-        c.contact_phone,
-        c.tracking_url
-    FROM outbound_include i
-    LEFT JOIN outbound_groupx g
-        ON i.shop_code = g.shop_code
-    LEFT JOIN shop s
-        ON i.shop_code = s.shop_code
-    LEFT JOIN carrier c 
-    	ON s.carrier = c.id
-    LEFT JOIN province p
-        ON s.province_id = p.id
-    WHERE i.dely_date = DATE('now')
-      AND p.region = 'tỉnh'
-    UNION ALL
-    SELECT
-        p1.to_shop AS shop_code,
-        s.shop_name,
-        '-' AS do_num,
-        'zLCNB' AS note,
-        SUM(p1.box_qty) AS box_qty,
-        g.groupx,
-        s.lead_time_day,
-        s.carrier,
-        c.contact_name,
-        c.contact_phone,
-        c.tracking_url
-    FROM pullback p1
-    LEFT JOIN outbound_groupx g
-        ON p1.to_shop = g.shop_code
-    LEFT JOIN shop s
-        ON p1.to_shop = s.shop_code
-    LEFT JOIN carrier c 
-    	ON s.carrier = c.id
-    LEFT JOIN province p
-        ON s.province_id = p.id
-    WHERE p1.pullback_date = DATE('now')
-      AND p1.to_shop NOT LIKE '%D111%'
-      AND p1.to_shop NOT LIKE '%D116%'
-      AND p.region = 'tỉnh'
-    GROUP BY
-        p1.to_shop,
-        s.shop_name,
-        g.groupx,
-        s.lead_time_day,
-        s.carrier,
-        c.contact_name,
-        c.contact_phone,
-        c.tracking_url
-) t
-GROUP BY t.shop_code
-ORDER BY MAX(t.groupx), MAX(t.shop_name);
 
-CREATE VIEW data_tool_inbound_report AS
-SELECT
-shop_code,
-shop_name,
-brand_name,
-region,
-box_qty,
-NULLIF(input_standard, 0) as product_qty,
-NULLIF(input_taras_defect, 0) as taras_qty,
-NULLIF(input_paper_bag, 0) as paper_qty,
-NULLIF(input_visual_merchandising, 0) as vm_qty,
-input_type,
-status,
-delivery_order_num as DO_num,
-good_issue_date as GI_date,
-arrival_date,
-good_receipt_date as GR_date,
-note
-FROM inbound
-WHERE good_receipt_date is null AND region <> "CONT";
 
-CREATE VIEW data_tool_outbound_report AS
-SELECT
-	id,
-	delivery_date,
-	post_date,
-    CASE
-    WHEN post_date IS NOT NULL THEN 'posted'
-    ELSE 'post null'
-    END AS "check",
-	checklist,
-	brand_name,
-	shop_code,
-    shop_name,
-    region,
-    stock_transfer_order_num as PO_num,
-    delivery_order_num as DO_num,
-    note as type,
-    box_qty,
-    NULLIF(product_qty, 0) as product_qty,
-	NULLIF(paper_bag_qty, 0) as paper_qty,
-    order_qty
-    FROM outbound
-	WHERE delivery_date = date('now')
-	ORDER BY shop_code ASC;
+
 
 CREATE VIEW vw_pbi_plan_daily AS
 WITH counted AS (
@@ -1326,35 +1224,6 @@ JOIN employee e ON e.employee_code = el.employee_code
 JOIN date_tb dt ON dt.Date = el.start_date
 JOIN vw_pbi_month_end_dates dm ON dm.year = dt.Year AND dm.month_number = dt.Month_Number_Of_Year;
 
-CREATE VIEW outbound_compare_2025_2026_CK AS
-SELECT
-    strftime('%m',delivery_date ) AS month,
-    SUM(CASE WHEN strftime('%Y', delivery_date) = '2025'
-             THEN product_qty ELSE 0 END) AS qty_2025,
-    SUM(CASE WHEN strftime('%Y', delivery_date) = '2026'
-             THEN product_qty ELSE 0 END) AS qty_2026
-FROM outbound
-WHERE brand_name = 'Charles & Keith'
-  AND strftime('%Y', delivery_date) IN ('2025', '2026')
-GROUP BY month
-ORDER BY month;
-
-CREATE VIEW inbound_compare_2025_2026_CK AS
-SELECT
-    strftime('%m', arrival_date) AS month,
-    SUM(CASE
-        WHEN strftime('%Y', arrival_date) = '2025'
-        THEN input_standard + input_taras_defect ELSE 0 END) AS qty_2025,
-    SUM(CASE
-        WHEN strftime('%Y', arrival_date) = '2026'
-        THEN input_standard + input_taras_defect ELSE 0 END) AS qty_2026
-FROM inbound
-WHERE brand_name = 'Charles & Keith'
-    AND region <> 'CONT'
-    AND strftime('%Y', arrival_date) IN ('2025', '2026')
-GROUP BY month
-ORDER BY month;
-
 CREATE VIEW vw_pbi_soh_capacity_base AS
 SELECT
     s.barcode,
@@ -1388,6 +1257,10 @@ WHERE NOT EXISTS (
     WHERE dt.Date >= de.start_date AND dt.Date <= de.end_date
 );
 
+
+
+
+
 CREATE VIEW test_ AS
 SELECT
 im.*,
@@ -1397,3 +1270,62 @@ FROM item_material im
 LEFT JOIN item_list il
 ON im.barcode = il.barcode
 WHERE im.material = 'DA';
+
+CREATE VIEW outbound_compare_2025_2026_CK AS
+SELECT
+    strftime('%m',delivery_date ) AS month,
+    SUM(CASE WHEN strftime('%Y', delivery_date) = '2025'
+             THEN product_qty ELSE 0 END) AS qty_2025,
+    SUM(CASE WHEN strftime('%Y', delivery_date) = '2026'
+             THEN product_qty ELSE 0 END) AS qty_2026
+FROM outbound
+WHERE brand_name = 'Charles & Keith'
+  AND strftime('%Y', delivery_date) IN ('2025', '2026')
+GROUP BY month
+ORDER BY month;
+
+CREATE VIEW inbound_compare_2025_2026_CK AS
+SELECT
+    strftime('%m', arrival_date) AS month,
+    SUM(CASE
+        WHEN strftime('%Y', arrival_date) = '2025'
+        THEN input_standard + input_taras_defect ELSE 0 END) AS qty_2025,
+    SUM(CASE
+        WHEN strftime('%Y', arrival_date) = '2026'
+        THEN input_standard + input_taras_defect ELSE 0 END) AS qty_2026
+FROM inbound
+WHERE brand_name = 'Charles & Keith'
+    AND region <> 'CONT'
+    AND strftime('%Y', arrival_date) IN ('2025', '2026')
+GROUP BY month
+ORDER BY month;
+
+CREATE VIEW check_dupSTO_outbound AS
+SELECT 
+    stock_transfer_order_num,
+    COUNT(*) AS duplicate_count
+FROM outbound
+GROUP BY stock_transfer_order_num
+HAVING COUNT(*) > 1;
+
+CREATE VIEW AAA_employee_on_work AS
+SELECT
+    employee_code,
+    employee_full_name,
+    employee_short_name
+FROM employee
+WHERE end_date IS NULL
+  AND employee_code NOT IN (
+      SELECT employee_code
+      FROM employee_leave
+      WHERE DATE('now', '+7 hours') BETWEEN start_date AND end_date
+  );
+
+CREATE VIEW AAA_employee_overtime_today AS
+SELECT 
+employee_full_name AS tên_NV,
+start_time AS giờ_bắt_đầu,
+end_time AS giờ_kết_thúc,
+overtime_hours AS tổng_giờ,
+reason AS công_việc
+FROM employee_overtime;

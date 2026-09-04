@@ -631,3 +631,43 @@ CREATE TABLE date_exception (
     note TEXT DEFAULT '-',
     CHECK (end_date >= start_date)
 );
+
+CREATE TABLE soh_change (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_date DATE DEFAULT (DATE('now')) CHECK (document_date IS NULL OR strftime('%Y-%m-%d', document_date ) = document_date ),
+    document_type TEXT DEFAULT "cyclecount",
+    document_num TEXT DEFAULT "DCCL",
+    site TEXT NOT NULL DEFAULT 'D111',
+	brand_code TEXT NOT NULL  DEFAULT '-',
+    movement_type TEXT DEFAULT '701' NOT NULL CHECK (movement_type IN ('701', '702')),
+	barcode TEXT DEFAULT '-',
+    article TEXT DEFAULT '-',
+	style_code TEXT DEFAULT '-',
+	size TEXT DEFAULT '-',
+	color TEXT DEFAULT '-',
+    soh_system INTEGER DEFAULT 0,
+    soh_physical INTEGER DEFAULT 0,
+	disparity INTEGER DEFAULT 0,
+	full_price INTEGER DEFAULT 0,
+    note TEXT DEFAULT '-',
+    FOREIGN KEY (brand_code) REFERENCES brand(brand_code) ON UPDATE CASCADE,
+    FOREIGN KEY (barcode) REFERENCES item_list(barcode) ON UPDATE CASCADE,
+    FOREIGN KEY (document_date) REFERENCES date_tb(Date),
+    FOREIGN KEY (document_num) REFERENCES stocktaking(stocktaking_num)
+);
+
+CREATE TABLE employee_overtime (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    overtime_date DATE DEFAULT (DATE('now')) CHECK (overtime_date IS NULL OR strftime('%Y-%m-%d', overtime_date) = overtime_date),
+	site TEXT DEFAULT 'D111',
+    employee_code TEXT NOT NULL,
+    employee_full_name TEXT DEFAULT '-',
+    start_time TEXT DEFAULT '00:00',
+    end_time TEXT DEFAULT '00:00',
+    overtime_hours REAL NOT NULL DEFAULT 0 CHECK (overtime_hours >= 0),
+    overtime_rate REAL DEFAULT 1.5 CHECK (overtime_rate >= 0),
+    reason TEXT DEFAULT '-',
+    note TEXT DEFAULT '-',
+    FOREIGN KEY (employee_code) REFERENCES employee(employee_code) ON UPDATE CASCADE,
+    FOREIGN KEY (overtime_date) REFERENCES date_tb(Date)
+);

@@ -129,7 +129,7 @@ ORDER BY d.id DESC;
 
 
 -- inbound by shop_code 
-select * from inbound where shop_code like 'PD D122' and inbound.input_taras_defect = 0 order by id desc;
+select * from inbound where shop_code like '5801' and inbound.input_taras_defect = 0 order by id desc;
 
 
 

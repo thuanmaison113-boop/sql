@@ -252,7 +252,107 @@ BEGIN
     WHERE id = NEW.id;
 END;
 
+CREATE TRIGGER soh_change_add_artical_stylesizecolor
+AFTER INSERT ON soh_change
+FOR EACH ROW
+WHEN NEW.barcode IS NOT NULL AND NEW.barcode != '-'
+BEGIN
+    UPDATE soh_change
+    SET
+        article = (SELECT il.variant FROM item_list il WHERE il.barcode = NEW.barcode),
+        style_code = (SELECT il.style_code FROM item_list il WHERE il.barcode = NEW.barcode),
+        size = (SELECT il.sizes FROM item_list il WHERE il.barcode = NEW.barcode),
+        color = (SELECT il.color FROM item_list il WHERE il.barcode = NEW.barcode),
+        full_price = (SELECT il.full_price FROM item_list il WHERE il.barcode = NEW.barcode)
+    WHERE rowid = NEW.rowid;
+END;
 
+CREATE TRIGGER soh_change_calc_disparity
+AFTER INSERT ON soh_change
+FOR EACH ROW
+BEGIN
+    UPDATE soh_change
+    SET
+        disparity = NEW.soh_physical - NEW.soh_system
+    WHERE rowid = NEW.rowid;
+END;
 
+CREATE TRIGGER employee_overtime_cal_overtime_hours
+AFTER INSERT ON employee_overtime
+FOR EACH ROW
+BEGIN
+    UPDATE employee_overtime
+    SET overtime_hours =
+        ROUND(
+            (
+                CASE
+                    WHEN end_time >= start_time THEN
+                        (
+                            (CAST(substr(end_time, 1, 2) AS INTEGER) * 60 +
+                             CAST(substr(end_time, 4, 2) AS INTEGER))
+                            -
+                            (CAST(substr(start_time, 1, 2) AS INTEGER) * 60 +
+                             CAST(substr(start_time, 4, 2) AS INTEGER))
+                        )
+                    ELSE
+                        (
+                            (CAST(substr(end_time, 1, 2) AS INTEGER) * 60 +
+                             CAST(substr(end_time, 4, 2) AS INTEGER))
+                            + 1440
+                            -
+                            (CAST(substr(start_time, 1, 2) AS INTEGER) * 60 +
+                             CAST(substr(start_time, 4, 2) AS INTEGER))
+                        )
+                END
+            ) / 60.0,
+            2
+        )
+    WHERE id = NEW.id;
+END;
 
+CREATE TRIGGER employee_overtime_cal_overtime_hours_update
+AFTER UPDATE OF start_time, end_time ON employee_overtime
+FOR EACH ROW
+WHEN NEW.start_time IS NOT OLD.start_time OR NEW.end_time IS NOT OLD.end_time
+BEGIN
+    UPDATE employee_overtime 
+    SET overtime_hours = 
+        ROUND(
+            (
+                CASE
+                    WHEN end_time >= start_time THEN
+                        (
+                            (CAST(substr(end_time, 1, 2) AS INTEGER) * 60 +
+                             CAST(substr(end_time, 4, 2) AS INTEGER))
+                            -
+                            (CAST(substr(start_time, 1, 2) AS INTEGER) * 60 +
+                             CAST(substr(start_time, 4, 2) AS INTEGER))
+                        )
+                    ELSE
+                        (
+                            (CAST(substr(end_time, 1, 2) AS INTEGER) * 60 +
+                             CAST(substr(end_time, 4, 2) AS INTEGER))
+                            + 1440
+                            -
+                            (CAST(substr(start_time, 1, 2) AS INTEGER) * 60 +
+                             CAST(substr(start_time, 4, 2) AS INTEGER))
+                        )
+                END
+            ) / 60.0,
+            2
+        )
+    WHERE rowid = NEW.rowid;
+END;
 
+CREATE TRIGGER employee_overtime_add_name
+AFTER INSERT ON employee_overtime
+FOR EACH ROW
+BEGIN
+    UPDATE employee_overtime
+    SET employee_full_name = (
+        SELECT employee_full_name
+        FROM employee
+        WHERE employee_code = NEW.employee_code
+    )
+    WHERE id = NEW.id;
+END;
