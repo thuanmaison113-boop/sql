@@ -140,6 +140,7 @@ SELECT
     region,
     stock_transfer_order_num as PO_num,
     delivery_order_num as DO_num,
+    transfer_order_num as TO_num,
     note as type,
     box_qty,
     NULLIF(product_qty, 0) as product_qty,
@@ -189,8 +190,6 @@ WHERE note LIKE '%defect%' AND post_date IS NULL
 ORDER BY id DESC
 LIMIT 10;
 
-CREATE VIEW AAA_ob_deli_today_include_multi_ck_pd AS
-
 CREATE VIEW AAA_outbound_pending  AS
 SELECT *
 FROM outbound
@@ -210,6 +209,9 @@ GROUP BY item_name
 HAVING 
     SUM(CASE WHEN status = 'inbound' THEN quantity ELSE 0 END)
     - SUM(CASE WHEN status = 'outbound' THEN quantity ELSE 0 END) > 0;
+
+
+
 
 CREATE VIEW vw_report_outbound_last_month AS
 SELECT
@@ -842,6 +844,31 @@ WHERE delivery_order_num = '-';
 
 
 
+CREATE VIEW AAA_employee_on_work AS
+SELECT
+    employee_code,
+    employee_full_name,
+    employee_short_name
+FROM employee
+WHERE end_date IS NULL
+  AND employee_code NOT IN (
+      SELECT employee_code
+      FROM employee_leave
+      WHERE DATE('now', '+7 hours') BETWEEN start_date AND end_date
+  );
+
+CREATE VIEW AAA_employee_overtime_today AS
+SELECT 
+employee_full_name AS tên_NV,
+start_time AS giờ_bắt_đầu,
+end_time AS giờ_kết_thúc,
+overtime_hours AS tổng_giờ,
+reason AS công_việc
+FROM employee_overtime
+WHERE overtime_date = date('now');
+
+
+
 CREATE VIEW AAA_PULLBACK_summary_month AS
 SELECT
     v.month,
@@ -1074,6 +1101,7 @@ WHERE delivery_date is NULL AND main_vendor <> "D116";
 
 CREATE VIEW AAA_way_bill_last_month  AS
 SELECT
+a.id,
 a.shop_code,
 a.shop_name,
 a.brand_name,
@@ -1232,9 +1260,9 @@ SELECT
     s.unrestricted,
     it.type AS item_type
 FROM (
-    SELECT barcode, brand, site, unrestricted FROM soh_main
+    SELECT barcode, brand, site, unrestricted FROM soh_main WHERE brand <> ""
     UNION ALL
-    SELECT barcode, brand, site, unrestricted FROM soh_taras
+    SELECT barcode, brand, site, unrestricted FROM soh_taras WHERE brand <> ""
 ) s
 LEFT JOIN item_list il ON s.barcode = il.barcode
 LEFT JOIN item_type it ON il.type = it.type
@@ -1261,7 +1289,117 @@ WHERE NOT EXISTS (
 
 
 
-CREATE VIEW test_ AS
+CREATE VIEW vw_pbi_soh_combined AS
+SELECT 'Main' AS site, article_number, article_type, brand,
+       article_name, barcode, color, size,
+       unrestricted, snapshot_date
+FROM soh_main WHERE brand <> ""
+UNION ALL
+SELECT 'Taras' AS site, article_number, article_type, brand,
+       article_name, barcode, color, size,
+       unrestricted, snapshot_date
+FROM soh_taras WHERE brand <> "";
+
+CREATE VIEW vw_pbi_soh_projected AS
+WITH baseline AS (
+    SELECT b.brand_code, b.brand_name, SUM(s.unrestricted) AS current_soh
+    FROM vw_pbi_soh_capacity_base s
+    JOIN item_list il ON s.barcode = il.barcode
+    JOIN brand b ON il.brand_name = b.brand_name
+    WHERE b.is_active = 1
+    GROUP BY b.brand_code, b.brand_name
+),
+dates AS (
+    SELECT dt.Date AS delivery_date
+    FROM date_tb dt
+    WHERE dt.Date >= DATE('now')
+      AND dt.Date <= (SELECT MAX(delivery_date) FROM vw_pbi_plan_final_all)
+      AND dt.Weekend = 'Weekday'
+      AND NOT EXISTS (SELECT 1 FROM date_exception de WHERE dt.Date BETWEEN de.start_date AND de.end_date)
+),
+flow_raw AS (
+    SELECT brand_code, delivery_date, plan_type, qty
+    FROM vw_pbi_plan_final_all
+    WHERE delivery_date >= DATE('now')
+),
+flow_shifted AS (
+    SELECT f.brand_code,
+           MIN(d.delivery_date) AS delivery_date,
+           f.plan_type,
+           SUM(f.qty) AS qty
+    FROM flow_raw f
+    JOIN dates d ON d.delivery_date >= f.delivery_date
+    GROUP BY f.brand_code, f.delivery_date, f.plan_type
+),
+flow AS (
+    SELECT brand_code, delivery_date,
+        SUM(CASE WHEN plan_type IN ('cont','pullback') THEN qty ELSE 0 END) AS inbound_qty,
+        SUM(CASE WHEN plan_type = 'outbound' THEN qty ELSE 0 END) AS outbound_qty
+    FROM flow_shifted
+    GROUP BY brand_code, delivery_date
+),
+grid AS (
+    SELECT b.brand_code, b.brand_name, d.delivery_date, b.current_soh,
+        COALESCE(f.inbound_qty,0) AS inbound_qty,
+        COALESCE(f.outbound_qty,0) AS outbound_qty
+    FROM baseline b
+    CROSS JOIN dates d
+    LEFT JOIN flow f ON f.brand_code = b.brand_code AND f.delivery_date = d.delivery_date
+)
+SELECT brand_code, brand_name, delivery_date,
+    current_soh + SUM(inbound_qty - outbound_qty) OVER (
+        PARTITION BY brand_code ORDER BY delivery_date
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS projected_soh
+FROM grid
+ORDER BY brand_code, delivery_date;
+
+CREATE VIEW vw_pbi_soh_projected_total AS
+SELECT delivery_date, SUM(projected_soh) AS total_projected_soh
+FROM vw_pbi_soh_projected
+GROUP BY delivery_date;
+
+CREATE VIEW vw_pbi_cont_plan AS
+SELECT
+    b.brand_code,
+    i.brand_name,
+    'cont' AS plan_type,
+    CAST(strftime('%m', i.arrival_date) AS INTEGER) AS plan_month,
+    CAST(strftime('%Y', i.arrival_date) AS INTEGER) AS plan_year,
+    i.arrival_date AS delivery_date,
+    (
+        COALESCE(i.input_standard, 0)
+        + COALESCE(i.input_taras_defect, 0)
+        + COALESCE(i.input_visual_merchandising, 0)
+    ) AS qty,
+    'EXIM' AS source,
+    i.note
+FROM inbound i
+LEFT JOIN brand b
+    ON b.brand_name = i.brand_name
+WHERE i.region = 'CONT'
+  AND i.arrival_date IS NOT NULL;
+
+CREATE VIEW vw_pbi_plan_final_all AS
+SELECT *
+FROM vw_pbi_plan_final
+UNION ALL
+SELECT
+    brand_code,
+    brand_name,
+    plan_type,
+    plan_month,
+    plan_year,
+    delivery_date,
+    qty,
+    source,
+    note
+FROM vw_pbi_cont_plan;
+
+
+
+
+CREATE VIEW item_material_specific AS
 SELECT
 im.*,
 SUBSTR(il.style_code, 1, 4) AS style_code,
@@ -1308,24 +1446,54 @@ FROM outbound
 GROUP BY stock_transfer_order_num
 HAVING COUNT(*) > 1;
 
-CREATE VIEW AAA_employee_on_work AS
-SELECT
-    employee_code,
-    employee_full_name,
-    employee_short_name
-FROM employee
-WHERE end_date IS NULL
-  AND employee_code NOT IN (
-      SELECT employee_code
-      FROM employee_leave
-      WHERE DATE('now', '+7 hours') BETWEEN start_date AND end_date
-  );
 
-CREATE VIEW AAA_employee_overtime_today AS
-SELECT 
-employee_full_name AS tên_NV,
-start_time AS giờ_bắt_đầu,
-end_time AS giờ_kết_thúc,
-overtime_hours AS tổng_giờ,
-reason AS công_việc
-FROM employee_overtime;
+
+
+CREATE VIEW vw_zdata_item_40_not_in_zsta AS
+SELECT e.*
+FROM item_export e
+LEFT JOIN item_zsta z
+    ON CAST(e.Variant AS TEXT) = CAST(z.variant AS TEXT)
+WHERE substr(CAST(e.Variant AS TEXT), 1, 2) = '40'
+  AND z.variant IS NULL;
+
+CREATE VIEW vw_zdata_item_list AS
+SELECT
+    e.id,
+    e.Brand_name AS brand_name,
+    e.Style_Code AS style_code,
+    e.Variant AS variant,
+    e.Base_Unit_of_Measure AS unit,
+    e.Barcode AS barcode,
+    e.Color_Description AS color,
+    e.Size AS sizes,
+    CAST(REPLACE(e.Full_Price, ',', '') AS REAL) AS full_price,
+    CAST(REPLACE(e.Markdown_Price_1, ',', '') AS REAL) AS markdown_price,
+    CASE
+        WHEN substr(CAST(e.Variant AS TEXT), 1, 2) = '40'
+            THEN z.type
+        ELSE t.type
+    END AS type,
+    e.Style_Code || ' ; ' ||
+    COALESCE(e.Color_Description, '-') || ' ; ' ||
+    COALESCE(e.Size, '-') AS item_full_name,
+    CASE
+        WHEN substr(CAST(e.Variant AS TEXT), 1, 2) = '40'
+            THEN z.type
+        ELSE t.kind
+    END AS kind
+FROM item_export e
+LEFT JOIN item_type t
+    ON substr(CAST(e.Variant AS TEXT), 1, 2) = t.variant_prefix
+    AND substr(CAST(e.Variant AS TEXT), 1, 2) <> '40'
+LEFT JOIN item_zsta z
+    ON CAST(e.Variant AS TEXT) = CAST(z.variant AS TEXT);
+
+CREATE VIEW vw_zdata_count_item_by_brand AS
+SELECT
+	b.brand_code, 
+	b.brand_name,
+	COUNT(*) AS total_rows
+FROM item_list i
+JOIN brand b ON i.brand_name = b.brand_name
+GROUP BY b.brand_code, b.brand_name;

@@ -1,4 +1,3 @@
-----------------outbound_add_shop_brand_region
 CREATE TRIGGER outbound_add_shop_brand_region
 AFTER INSERT ON outbound
 FOR EACH ROW
@@ -11,7 +10,6 @@ BEGIN
     WHERE rowid = NEW.rowid;
 END;
 
-------------inbound_add_infos
 CREATE TRIGGER inbound_add_infos
 AFTER INSERT ON inbound
 FOR EACH ROW
@@ -30,7 +28,6 @@ BEGIN
     WHERE rowid = NEW.rowid;
 END;
 
-----------------inbound_change_status
 CREATE TRIGGER inbound_change_status
 AFTER UPDATE OF current_action, arrival_date ON inbound
 FOR EACH ROW
@@ -47,7 +44,6 @@ BEGIN
     WHERE rowid = NEW.rowid;
 END;
 
-----------------cyclecount_add_brand_name
 CREATE TRIGGER cyclecount_add_brand_name
 AFTER INSERT ON cyclecount
 FOR EACH ROW
@@ -61,7 +57,6 @@ BEGIN
     WHERE id = NEW.id;
 END;
 
-----------------stocktaking_add_brand_name
 CREATE TRIGGER stocktaking_add_brand_name
 AFTER INSERT ON stocktaking
 FOR EACH ROW
@@ -75,7 +70,6 @@ BEGIN
     WHERE id = NEW.id;
 END;
 
-----------------cyclecount_calc_difference
 CREATE TRIGGER cyclecount_calc_difference
 AFTER UPDATE ON cyclecount
 FOR EACH ROW
@@ -85,7 +79,6 @@ BEGIN
     WHERE id = NEW.id;
 END;
 
-----------------outbound_disparity_insert
 CREATE TRIGGER outbound_disparity_insert
 AFTER INSERT ON outbound_disparity
 FOR EACH ROW
@@ -99,7 +92,6 @@ BEGIN
     WHERE rowid = NEW.rowid;
 END;
 
-----------------inbound_ecom_add_info
 CREATE TRIGGER inbound_ecom_add_info
 AFTER INSERT ON inbound_ecom
 FOR EACH ROW
@@ -112,7 +104,6 @@ BEGIN
     WHERE rowid = NEW.rowid;
 END;
 
-----------------defect_after_insert_barcode
 CREATE TRIGGER defect_after_insert_barcode
 AFTER INSERT ON defect
 FOR EACH ROW
@@ -121,13 +112,13 @@ BEGIN
     UPDATE defect
     SET
         shop_name = (SELECT i.shop_name FROM inbound i WHERE i.purchase_order_num = NEW.purchase_order_num),
+        brand_name = (SELECT i.brand_name FROM inbound i WHERE i.purchase_order_num = NEW.purchase_order_num),
         artical = (SELECT il.variant FROM item_list il WHERE il.barcode = NEW.barcode),
         item_full_name = (SELECT il.item_full_name FROM item_list il WHERE il.barcode = NEW.barcode),
         style_code = (SELECT il.style_code FROM item_list il WHERE il.barcode = NEW.barcode)
     WHERE rowid = NEW.rowid;
 END;
 
-----------------defect_after_insert_artical
 CREATE TRIGGER defect_after_insert_artical
 AFTER INSERT ON defect
 FOR EACH ROW
@@ -136,13 +127,13 @@ BEGIN
     UPDATE defect
     SET
         shop_name = (SELECT i.shop_name FROM inbound i WHERE i.purchase_order_num = NEW.purchase_order_num),
+        brand_name = (SELECT i.brand_name FROM inbound i WHERE i.purchase_order_num = NEW.purchase_order_num),
         barcode = (SELECT il.barcode FROM item_list il WHERE il.variant = NEW.artical ),
         item_full_name = (SELECT il.item_full_name FROM item_list il WHERE il.variant = NEW.artical),
         style_code = (SELECT il.style_code FROM item_list il WHERE il.variant = NEW.artical)
     WHERE rowid = NEW.rowid;
 END;
 
-----------------outbound_include_add_shop_name
 CREATE TRIGGER outbound_include_add_shop_name
 AFTER INSERT ON outbound_include
 FOR EACH ROW
@@ -153,7 +144,6 @@ BEGIN
     WHERE rowid = NEW.rowid;
 END;
 
-----------------pda_devices_insert
 CREATE TRIGGER pda_devices_insert
 AFTER INSERT ON pda_devices
 FOR EACH ROW
@@ -167,7 +157,6 @@ BEGIN
     WHERE rowid = NEW.rowid;
 END;
 
-----------------plan_mer_overall_add_brand_name
 CREATE TRIGGER plan_mer_overall_add_brand_name
 AFTER INSERT ON plan_mer_overall
 FOR EACH ROW
@@ -178,7 +167,6 @@ BEGIN
        	WHERE rowid = NEW.rowid;
 END;
 
-----------------plan_transaction_frequency_add_brand_name
 CREATE TRIGGER plan_transaction_frequency_add_brand_name
 AFTER INSERT ON plan_transaction_frequency
 FOR EACH ROW
@@ -189,7 +177,6 @@ BEGIN
        	WHERE rowid = NEW.rowid;
 END;
 
-----------------employee_leave_add_name
 CREATE TRIGGER employee_leave_add_name
 AFTER INSERT ON employee_leave
 FOR EACH ROW
@@ -200,7 +187,6 @@ BEGIN
        	WHERE rowid = NEW.rowid;
 END;
 
-----------------employee_leave_calc_total_day
 CREATE TRIGGER employee_leave_calc_total_day
 AFTER INSERT ON employee_leave
 FOR EACH ROW
@@ -226,7 +212,6 @@ BEGIN
     WHERE id = NEW.id;
 END;
 
-----------------employee_leave_calc_total_day_update
 CREATE TRIGGER employee_leave_calc_total_day_update
 AFTER UPDATE OF start_date, end_date ON employee_leave
 FOR EACH ROW
@@ -250,31 +235,6 @@ BEGIN
         )
     )
     WHERE id = NEW.id;
-END;
-
-CREATE TRIGGER soh_change_add_artical_stylesizecolor
-AFTER INSERT ON soh_change
-FOR EACH ROW
-WHEN NEW.barcode IS NOT NULL AND NEW.barcode != '-'
-BEGIN
-    UPDATE soh_change
-    SET
-        article = (SELECT il.variant FROM item_list il WHERE il.barcode = NEW.barcode),
-        style_code = (SELECT il.style_code FROM item_list il WHERE il.barcode = NEW.barcode),
-        size = (SELECT il.sizes FROM item_list il WHERE il.barcode = NEW.barcode),
-        color = (SELECT il.color FROM item_list il WHERE il.barcode = NEW.barcode),
-        full_price = (SELECT il.full_price FROM item_list il WHERE il.barcode = NEW.barcode)
-    WHERE rowid = NEW.rowid;
-END;
-
-CREATE TRIGGER soh_change_calc_disparity
-AFTER INSERT ON soh_change
-FOR EACH ROW
-BEGIN
-    UPDATE soh_change
-    SET
-        disparity = NEW.soh_physical - NEW.soh_system
-    WHERE rowid = NEW.rowid;
 END;
 
 CREATE TRIGGER employee_overtime_cal_overtime_hours
@@ -355,4 +315,93 @@ BEGIN
         WHERE employee_code = NEW.employee_code
     )
     WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER soh_701_702_add_artical_stylesizecolor
+AFTER INSERT ON soh_701_702
+FOR EACH ROW
+WHEN NEW.barcode IS NOT NULL AND NEW.barcode != '-'
+BEGIN
+    UPDATE soh_701_702
+    SET
+        article = (SELECT il.variant FROM item_list il WHERE il.barcode = NEW.barcode),
+        style_code = (SELECT il.style_code FROM item_list il WHERE il.barcode = NEW.barcode),
+        size = (SELECT il.sizes FROM item_list il WHERE il.barcode = NEW.barcode),
+        color = (SELECT il.color FROM item_list il WHERE il.barcode = NEW.barcode),
+        full_price = (SELECT il.full_price FROM item_list il WHERE il.barcode = NEW.barcode)
+    WHERE rowid = NEW.rowid;
+END;
+
+
+CREATE TRIGGER soh_701_702_calc_disparity
+AFTER INSERT ON soh_701_702
+FOR EACH ROW
+BEGIN
+    UPDATE soh_701_702
+    SET
+        disparity = NEW.soh_physical - NEW.soh_system
+    WHERE rowid = NEW.rowid;
+END;
+
+CREATE TRIGGER item_consignment_add_shop_name
+AFTER INSERT ON item_consignment
+FOR EACH ROW
+BEGIN
+    UPDATE item_consignment
+    SET 
+        shop_name = (SELECT s.shop_name FROM "shop" s WHERE s.shop_code = NEW.shop_code)
+    WHERE rowid = NEW.rowid;
+END;
+
+CREATE TRIGGER pda_devices_update
+AFTER UPDATE OF assigned_to ON pda_devices
+FOR EACH ROW
+BEGIN
+    UPDATE pda_devices
+    SET assigned_user_name = (
+        SELECT e.employee_short_name
+        FROM employee e
+        WHERE e.user_SAP = NEW.assigned_to
+    )
+    WHERE rowid = NEW.rowid;
+END;
+
+CREATE TRIGGER item_checker_after_insert_variant
+AFTER INSERT ON item_checker
+FOR EACH ROW
+WHEN NEW.variant IS NOT NULL
+BEGIN
+    UPDATE item_checker
+    SET
+        barcode = (SELECT il.barcode FROM item_list il WHERE il.variant = NEW.variant),
+        item_full_name = (SELECT il.item_full_name FROM item_list il WHERE il.variant = NEW.variant),
+        full_price = (SELECT il.full_price FROM item_list il WHERE il.variant = NEW.variant),
+        markdown_price = (SELECT il.markdown_price FROM item_list il WHERE il.variant = NEW.variant),
+        type = (SELECT il.type FROM item_list il WHERE il.variant = NEW.variant),
+        unit = (SELECT il.unit FROM item_list il WHERE il.variant = NEW.variant),
+        brand_name = (SELECT il.brand_name FROM item_list il WHERE il.variant = NEW.variant),
+        style_code = (SELECT il.style_code FROM item_list il WHERE il.variant = NEW.variant),
+        sizes = (SELECT il.sizes FROM item_list il WHERE il.variant = NEW.variant),
+        color = (SELECT il.color FROM item_list il WHERE il.variant = NEW.variant)
+    WHERE rowid = NEW.rowid;
+END;
+
+CREATE TRIGGER item_checker_after_insert_barcode
+AFTER INSERT ON item_checker
+FOR EACH ROW
+WHEN NEW.barcode IS NOT NULL
+BEGIN
+    UPDATE item_checker
+    SET
+        variant = (SELECT il.variant FROM item_list il WHERE il.barcode = NEW.barcode),
+        item_full_name = (SELECT il.item_full_name FROM item_list il WHERE il.barcode = NEW.barcode),
+        full_price = (SELECT il.full_price FROM item_list il WHERE il.barcode = NEW.barcode),
+        markdown_price = (SELECT il.markdown_price FROM item_list il WHERE il.barcode = NEW.barcode),
+        type = (SELECT il.type FROM item_list il WHERE il.barcode = NEW.barcode),
+        unit = (SELECT il.unit FROM item_list il WHERE il.barcode = NEW.barcode),
+        brand_name = (SELECT il.brand_name FROM item_list il WHERE il.barcode = NEW.barcode),
+        style_code = (SELECT il.style_code FROM item_list il WHERE il.barcode = NEW.barcode),
+        sizes = (SELECT il.sizes FROM item_list il WHERE il.barcode = NEW.barcode),
+        color = (SELECT il.color FROM item_list il WHERE il.barcode = NEW.barcode)
+    WHERE rowid = NEW.rowid;
 END;

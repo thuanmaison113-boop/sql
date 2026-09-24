@@ -1,4 +1,3 @@
--- chống phân mảnh
 VACUUM;
 ANALYZE;
 
@@ -6,55 +5,67 @@ INSERT INTO brand_new (id, brand_code, brand_name, storage_location)
 SELECT id, brand_code, brand_name, storage_location
 FROM brand;
 
--- RENEW ITEM LIST
+
 DELETE FROM item_list;
 DELETE FROM sqlite_sequence WHERE name = 'item_list';
+INSERT INTO item_list SELECT * FROM vw_zdata_item_list;
+
+
+DELETE FROM item_export
+WHERE Brand_name IN (
+"Ted Baker",
+"Marhen.J",
+"Ceci",
+"CONVERSE",
+"BIRKENSTOCK",
+"NEW BALANCE",
+"ON RUNNING",
+"NIKE",
+"CROCS",
+"JORDAN",
+"NINE WEST",
+"Multibrand"
+)
+
+DELETE FROM item_export
+WHERE Brand_name IN (
+"Charles & Keith",
+"Pedro"
+)
+
+
+DELETE FROM item_export WHERE id NOT IN ( SELECT MAX(id) FROM item_export GROUP BY barcode) AND barcode IN ( SELECT barcode FROM item_export GROUP BY barcode HAVING COUNT(*) > 1 );
+
+
+
 
 
 DELETE FROM soh_main;
 DELETE FROM soh_taras;
+DELETE FROM sqlite_sequence WHERE name = 'soh_main';
+DELETE FROM sqlite_sequence WHERE name = 'soh_taras';
+
 
 -- GET COLUMN LIST HORIZONTALLY
-SELECT GROUP_CONCAT(name, ', ') AS column_list
-FROM PRAGMA_TABLE_INFO('brand');
+SELECT GROUP_CONCAT(name, ', ') AS column_list FROM PRAGMA_TABLE_INFO('brand');
 
 -- GET COLUMN LIST VERTICALLY 
-SELECT name || ',' AS column_name_with_comma
-FROM PRAGMA_TABLE_INFO('inbound');
+SELECT name || ',' AS column_name_with_comma FROM PRAGMA_TABLE_INFO('inbound');
 
--------------------thêm dòng vào inbound để cân bằng báo cáo ngày
-INSERT INTO inbound (shop_code, good_issue_date,status,arrival_date,current_action, good_receipt_date)
-VALUES ('TEMP','2026-04-29', 'complete', '2026-04-29', 'confirm','2026-04-29');
+-------------------thêm dòng ảo để cân bằng báo cáo ngày
+INSERT INTO inbound (shop_code, good_issue_date,status,arrival_date,current_action, good_receipt_date) VALUES ('TEMP','2026-04-29', 'complete', '2026-04-29', 'confirm','2026-04-29');
+INSERT INTO outbound (shop_code, post_date) VALUES ('TEMP', '2026-04-04');
 
--------------------thêm dòng vào outbound để cân bằng báo cáo ngày
-INSERT INTO outbound (shop_code, post_date)
-VALUES ('TEMP', '2026-04-04');
 
--- UPDATE item_materia
-UPDATE item_material
-SET material = REPLACE(material, 'Thành phần: ', '')
-WHERE material LIKE '%Thành phần: %';
-UPDATE item_material
-SET material = REPLACE(material, 'Thành phần chính', 'chính')
-WHERE material LIKE '%Thành phần%';
-UPDATE item_material
-SET material = REPLACE(material, 'Lớp lót', 'lót')
-WHERE material LIKE '%Lớp lót%';
-UPDATE item_material
-SET material = REPLACE(material, 'Lớp đế', 'đế')
-WHERE material LIKE '%Lớp đế%';
-UPDATE item_material
-SET material = 'Da Tổng Hợp'
-WHERE material = 'Da Tổng Hợp (chính)';
-
--- DELETE item_material
-DELETE FROM item_material
-WHERE material = 'Theo thông tin trên bao bì' OR material is null OR barcode like '%+12';
+UPDATE item_material SET material = REPLACE(material, 'Thành phần: ', '') WHERE material LIKE '%Thành phần: %';
+UPDATE item_material SET material = REPLACE(material, 'Thành phần chính', 'chính') WHERE material LIKE '%Thành phần%';
+UPDATE item_material SET material = REPLACE(material, 'Lớp lót', 'lót') WHERE material LIKE '%Lớp lót%';
+UPDATE item_material SET material = REPLACE(material, 'Lớp đế', 'đế') WHERE material LIKE '%Lớp đế%';
+UPDATE item_material SET material = 'Da Tổng Hợp' WHERE material = 'Da Tổng Hợp (chính)';
+DELETE FROM item_material WHERE material = 'Theo thông tin trên bao bì' OR material is null OR barcode like '%+12';
 
 -- DELETE row have lower id in item_material
-DELETE FROM item_material
-WHERE id NOT IN ( SELECT MAX(id) FROM item_material GROUP BY barcode )
-AND barcode IN ( SELECT barcode FROM item_material GROUP BY barcode HAVING COUNT(*) > 1 );
+DELETE FROM item_material WHERE id NOT IN ( SELECT MAX(id) FROM item_material GROUP BY barcode ) AND barcode IN ( SELECT barcode FROM item_material GROUP BY barcode HAVING COUNT(*) > 1 );
 
 -------------------Check inbound integrity
 SELECT id, shop_code, shop_name AS recorded_shop_name,

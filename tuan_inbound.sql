@@ -41,7 +41,6 @@ box_qty,
 input_standard,
 input_paper_bag,
 input_taras_defect,
---CONCAT(box_qty, '-', input_standard, '-', input_taras_defect, '-', input_paper_bag) AS input,
 transfer_order_quality_issue AS TO_QI,
 substandard_qty AS QI_Qty,
 purchase_order_num AS STO,
@@ -49,8 +48,10 @@ delivery_order_num AS DO,
 good_issue_date AS send_date,
 arrival_date
 FROM inbound  
-WHERE good_receipt_date IS NULL AND region <> 'CONT';
---WHERE purchase_order_num IN ()
+WHERE good_receipt_date IS NULL AND region <> 'CONT'
+--AND purchase_order_num IN ( )
+
+
 
 
 
@@ -93,7 +94,8 @@ good_receipt_date,
 delivery_order_num AS DO,
 purchase_order_num
 FROM inbound
-WHERE action = 'post';
+WHERE action = 'post'
+--AND purchase_order_num IN ()
 
 
 
@@ -106,15 +108,16 @@ SELECT
     d.id,
     d.results,
     d.purchase_order_num AS PO,
-    d.shop_name AS tên_shop,
-    d.defect_qty AS số_lượng,
+    d.shop_name,
+    d.defect_qty,
     d.barcode,
     d.artical,
     d.item_full_name AS tên_sản_phẩm,
     d.defect_type AS lỗi,
     d.solution AS hướng_xử_lý,
     d.note,
-    d.checklist
+    d.checklist,
+    d.brand_name
 FROM defect d
 WHERE d.results IS NULL
 ORDER BY d.id DESC;
@@ -129,35 +132,21 @@ ORDER BY d.id DESC;
 
 
 -- inbound by shop_code 
-select * from inbound where shop_code like '5801' and inbound.input_taras_defect = 0 order by id desc;
+select * from inbound where shop_code like '1060' and inbound.input_taras_defect = 0 order by id desc;
 
 
 
 -- defect by shop_code
-SELECT
-d.id,
-d.results,
-d.purchase_order_num AS PO,
-d.shop_name AS tên_shop,
-d.defect_qty AS số_lượng,
-d.barcode,
-d.artical ,
-d.item_full_name AS tên_sản_phẩm,
-d.defect_type AS lỗi,
-d.solution AS hướng_xử_lý,
-d.note
-FROM defect d
-		INNER JOIN inbound i ON d.purchase_order_num = i.purchase_order_num
-		WHERE i.shop_code = '1139'
-ORDER BY d.id DESC;
+SELECT * FROM defect d INNER JOIN inbound i ON d.purchase_order_num = i.purchase_order_num WHERE i.shop_code = '1129' ORDER BY d.id DESC;
 
 
 
--- defect by style code
-select * from defect where style_code like "PM1-85110493" ;
+-- defect by style code1
+select * from defect where style_code = "PW1-26480096-1" order by id desc
 
 
-
+-- item list by style code
+select * from item_list where style_code = "PM1-85110437-1"
 
 
 

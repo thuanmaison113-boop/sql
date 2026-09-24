@@ -160,6 +160,7 @@ CREATE TABLE defect (
     note TEXT DEFAULT '-',
     style_code TEXT,
     checklist TEXT DEFAULT '-',
+    brand_name TEXT DEFAULT '-',
     FOREIGN KEY (purchase_order_num) REFERENCES inbound(purchase_order_num)
         ON UPDATE CASCADE,
     FOREIGN KEY (barcode) REFERENCES item_list(barcode)
@@ -191,6 +192,7 @@ CREATE TABLE item_list (
     markdown_price INTEGER CHECK (markdown_price >= 0),
     type TEXT,
     item_full_name TEXT,
+    kind TEXT,
     FOREIGN KEY (brand_name) REFERENCES brand(brand_name)
         --ON DELETE CASCADE
         ON UPDATE CASCADE,
@@ -205,7 +207,9 @@ CREATE INDEX idx_item_list_style_code ON item_list(style_code);
 
 CREATE TABLE item_type (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-	type TEXT
+	type TEXT,
+	kind TEXT,
+	variant_prefix Text
 );
 
 CREATE TABLE carrier_area (
@@ -341,11 +345,11 @@ CREATE TABLE stocktaking (
 
 CREATE TABLE a_bin_temp (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    bin TEXT NOT NULL,
+    bin TEXT NOT NULL DEFAULT '-',
     section TEXT,
-	note TEXT,
-	qty INTEGER,
-    note2 TEXT DEFAULT '-'
+	description TEXT DEFAULT '-',
+	qty INTEGER DEFAULT 0,
+    note TEXT DEFAULT '-'
 );
 
 CREATE TABLE item_paper_bag (
@@ -424,7 +428,11 @@ CREATE TABLE employee (
     is_direct_labor INTEGER DEFAULT 1 CHECK (is_direct_labor IN (0, 1)),
     start_date DATE CHECK (start_date IS NULL OR strftime('%Y-%m-%d', start_date) = start_date),
     end_date DATE CHECK (end_date IS NULL OR strftime('%Y-%m-%d', end_date) = end_date),
+    birth_year INTEGER DEFAULT 0,
+    hometow TEXT DEFAULT "-",
     main_site_code TEXT DEFAULT 'D111',
+    motorbike_plate TEXT DEFAULT '-',
+    motorbike_card_no TEXT DEFAULT '-',
     note TEXT DEFAULT '-',
     FOREIGN KEY (start_date) REFERENCES date_tb(Date),
     FOREIGN KEY (end_date) REFERENCES date_tb(Date)
@@ -467,7 +475,7 @@ CREATE TABLE inbound_ecom (
 CREATE TABLE a_documentation (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     type TEXT,
-    name TEXT,
+    name TEXT NOT NULL UNIQUE,
 	description TEXT
 );
 
@@ -524,7 +532,7 @@ CREATE TABLE pda_devices (
     location TEXT DEFAULT 'D111',
     assigned_to TEXT DEFAULT '-',
     assigned_user_name TEXT DEFAULT '-',
-    note TEXT,
+    note TEXT DEFAULT '-',
     FOREIGN KEY (assigned_to) REFERENCES employee(employee_code)
 );
 
@@ -546,7 +554,7 @@ CREATE TABLE soh_main (
 	blocked TEXT DEFAULT '-',
 	batch TEXT DEFAULT '-',
 	note TEXT DEFAULT '-',
-	snapshot_datetime TEXT NOT NULL DEFAULT (datetime('now', '+7 hours')),
+	snapshot_date DATE DEFAULT (DATE('now')),
     FOREIGN KEY (brand) REFERENCES brand(brand_code),
     FOREIGN KEY (barcode) REFERENCES item_list(barcode)
 );
@@ -569,7 +577,7 @@ CREATE TABLE soh_taras (
 	blocked TEXT DEFAULT '-',
 	batch TEXT DEFAULT '-',
 	note TEXT DEFAULT '-',
-	snapshot_datetime TEXT NOT NULL DEFAULT (datetime('now', '+7 hours')),
+	snapshot_date DATE DEFAULT (DATE('now')),
 	FOREIGN KEY (brand) REFERENCES brand(brand_code),
     FOREIGN KEY (barcode) REFERENCES item_list(barcode)
 );
@@ -632,7 +640,7 @@ CREATE TABLE date_exception (
     CHECK (end_date >= start_date)
 );
 
-CREATE TABLE soh_change (
+CREATE TABLE soh_701_702 (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     document_date DATE DEFAULT (DATE('now')) CHECK (document_date IS NULL OR strftime('%Y-%m-%d', document_date ) = document_date ),
     document_type TEXT DEFAULT "cyclecount",
@@ -670,4 +678,128 @@ CREATE TABLE employee_overtime (
     note TEXT DEFAULT '-',
     FOREIGN KEY (employee_code) REFERENCES employee(employee_code) ON UPDATE CASCADE,
     FOREIGN KEY (overtime_date) REFERENCES date_tb(Date)
+);
+
+CREATE TABLE carrier_claim (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_date DATE NOT NULL DEFAULT (DATE('now')),
+    carier TEXT DEFAULT "-",
+    type TEXT DEFAULT "-",
+	description TEXT,
+	FOREIGN KEY (carier) REFERENCES carrier(id),
+	FOREIGN KEY (event_date) REFERENCES date_tb(Date)
+);
+
+CREATE TABLE item_consignment (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date_received DATE DEFAULT (DATE('now')) CHECK (date_received IS NULL OR strftime('%Y-%m-%d', date_received) = date_received),
+    consignt_type TEXT DEFAULT 'renovation',
+    shop_code TEXT DEFAULT '-',
+    shop_name TEXT,
+    good_name TEXT DEFAULT '-',
+    quantity INTEGER DEFAULT 0 CHECK (quantity >= 0),
+    note1 TEXT DEFAULT '-',
+    storage_location TEXT DEFAULT '-',
+    date_returned DATE CHECK (date_returned IS NULL OR strftime('%Y-%m-%d', date_returned) = date_returned),
+    note2 TEXT DEFAULT '-',
+    checklist TEXT DEFAULT 0,
+    FOREIGN KEY (shop_code) REFERENCES shop(shop_code) ON UPDATE CASCADE,
+    FOREIGN KEY (date_received) REFERENCES date_tb(Date),
+    FOREIGN KEY (date_returned) REFERENCES date_tb(Date)
+);
+
+CREATE TABLE asset_master (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    asset_name TEXT DEFAULT '-',
+    asset_type TEXT DEFAULT '-',
+    asset_qty INTEGER DEFAULT 0 CHECK (asset_qty >= 0),  
+    status TEXT DEFAULT 'in_use',
+    note TEXT DEFAULT '-',
+    condition TEXT DEFAULT 'good',
+    location TEXT DEFAULT 'D111',
+    last_check_date DATE CHECK (last_check_date IS NULL OR strftime('%Y-%m-%d', last_check_date) = last_check_date),
+    FOREIGN KEY (last_check_date) REFERENCES date_tb(Date)
+);
+
+CREATE TABLE capacity_observation (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    observation_date DATE DEFAULT (DATE('now')),
+    estimated_fill_pct REAL,
+    soh_at_observation INTEGER,
+    note TEXT DEFAULT '-'
+);
+
+CREATE TABLE item_checker (
+    barcode TEXT,
+    variant TEXT,
+    item_full_name TEXT,
+    full_price INTEGER,
+    markdown_price INTEGER,
+    type TEXT,
+    unit TEXT,
+    brand_name TEXT,
+    style_code TEXT,
+    sizes TEXT,
+    color TEXT,
+	note TEXT DEFAULT '-'
+);
+
+CREATE TABLE item_zsta (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+    barcode TEXT UNIQUE,
+    variant TEXT UNIQUE,
+    type TEXT,
+    FOREIGN KEY (barcode) REFERENCES item_list(barcode),
+    FOREIGN KEY (variant) REFERENCES item_list(variant),
+    FOREIGN KEY (type) REFERENCES item_type(type)
+);
+
+CREATE TABLE item_export (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    Brand TEXT,
+    Brand_name TEXT,
+    Article_Type TEXT,
+    Article_Category TEXT,
+    Style_Code TEXT,
+    Generic_Article TEXT,
+    Variant TEXT,
+    Base_Unit_of_Measure TEXT,
+    English_Name TEXT,
+    Vietnamese_Name TEXT,
+    Barcode TEXT,
+    Color TEXT,
+    Color_Description TEXT,
+    Size TEXT,
+    Itemcode TEXT,
+    Department TEXT,
+    Department_Name TEXT,
+    Merchandise_Category TEXT,
+    Category_Description TEXT,
+    Season TEXT,
+    Year TEXT,
+    Detail TEXT,
+    Collection TEXT,
+    Description_1 TEXT,
+    Description_2 TEXT,
+    FOB_Price TEXT,
+    Cur1 TEXT,
+    Principal_Price TEXT,
+    Cur2 TEXT,
+    Full_Price TEXT,
+    Cur3 TEXT,
+    Valid_From1 TEXT,
+    Markdown_Price_1 TEXT,
+    Cur4 TEXT,
+    Valid_From2 TEXT,
+    Valid_To1 TEXT,
+    Markdown_Price_2 TEXT,
+    Cur6 TEXT,
+    Valid_From3 TEXT,
+    Valid_To2 TEXT,
+    Fashion_Grade TEXT,
+    Generic_Name TEXT,
+    Country TEXT,
+    Original_Price TEXT,
+    Tax_classific TEXT,
+    snapshot_datetime TEXT NOT NULL DEFAULT (datetime('now', '+7 hours'))
 );
