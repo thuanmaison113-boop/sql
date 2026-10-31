@@ -29,7 +29,7 @@ BACKUP_DIR = Path(
 # This file will always be replaced with the newest version.
 # ------------------------------------------------------------
 LATEST_DB = Path(
-    r"D:\OneDrive - MAISON RMI\inventory_database_111_onedrive\container\pbi_supplier.sqlite3"
+    r"D:\OneDrive - MAISON RMI\pbi_supplier.sqlite3"
 )
 
 
